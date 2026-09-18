@@ -71,7 +71,8 @@ local spawns = Instance.new("Folder")
 spawns.Name = "SpawnPoints"
 spawns.Parent = gameplay
 for index, x in { -22, 22 } do
-	local spawn = part(string.format("Spawn%02d", index), Vector3.new(4, 0.2, 4), CFrame.new(x, 0.1, 0), colors.Red, Enum.Material.Neon, spawns)
+	local position = Vector3.new(x, 0.1, 0)
+	local spawn = part(string.format("Spawn%02d", index), Vector3.new(4, 0.2, 4), CFrame.lookAt(position, Vector3.new(0, 0.1, 0)), colors.Red, Enum.Material.Neon, spawns)
 	spawn.Transparency = 0.78
 	spawn.CanCollide = false
 end
@@ -87,7 +88,7 @@ fs.writeFile("assets/World.rbxm", roblox.serializeModel({ world }))
 local ball = Instance.new("Part")
 ball.Name = "FatalBall"
 ball.Shape = Enum.PartType.Ball
-ball.Size = Vector3.one * 4.5
+ball.Size = Vector3.one * 2.2
 ball.Color = Color3.fromRGB(20, 21, 24)
 ball.Material = Enum.Material.Metal
 ball.Anchored = true
@@ -97,14 +98,14 @@ ball.CanQuery = false
 local light = Instance.new("PointLight")
 light.Name = "CoreLight"
 light.Color = colors.Red
-light.Brightness = 2.5
-light.Range = 18
+light.Brightness = 2
+light.Range = 10
 light.Parent = ball
 local trailTop = Instance.new("Attachment")
-trailTop.Position = Vector3.new(0, 1.05, 0)
+trailTop.Position = Vector3.new(0, 0.52, 0)
 trailTop.Parent = ball
 local trailBottom = Instance.new("Attachment")
-trailBottom.Position = Vector3.new(0, -1.05, 0)
+trailBottom.Position = Vector3.new(0, -0.52, 0)
 trailBottom.Parent = ball
 local trail = Instance.new("Trail")
 trail.Name = "MomentumTrail"

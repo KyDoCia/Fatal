@@ -67,18 +67,56 @@ function CombatService:_reject(combatant, reason, metrics, revision)
 	return false, reason
 end
 
-function CombatService:TryConfirm(combatant, now)
-	local state = self:_state(combatant.Id)
-	self:_advancePhase(state, now)
-	if state.Phase ~= "Active" or now > state.ActiveUntil then return false end
-	if not self.Combatants:IsAlive(combatant.Id) or self.Ball:GetTarget() ~= combatant then return false end
-	if self.Ball:GetRevision() ~= state.ArmedRevision then return false end
-	local metrics = self:_metrics(combatant)
-	if metrics.Distance > Config.Parry.Range or not metrics.InArc or metrics.Closing <= Config.Parry.ApproachEpsilon then return false end
-	if not self.Ball:Redirect(combatant, state.ArmedRevision) then return false end
+function CombatService:_endAttempt(state, now)
 	state.Phase = "Recovery"
 	state.RecoveryUntil = now + Config.Parry.Recovery
-	state.ReadyAt = math.max(state.ReadyAt, now + Config.Parry.Cooldown)
+	state.ReadyAt = math.max(state.ReadyAt, now + Config.Parry.Recovery)
+end
+
+function CombatService:TryConfirm(combatant, now)
+	local state = self:_state(combatant.Id)
+	if state.Phase ~= "Active" then self:_advancePhase(state, now); return false end
+	if now > state.ActiveUntil then
+		local metrics = if self.Combatants:IsAlive(combatant.Id) and self.Ball:GetTarget() == combatant then self:_metrics(combatant) else nil
+		local reason = if metrics and metrics.Closing > Config.Parry.ApproachEpsilon and metrics.Distance > Config.Parry.Range then "TOO_EARLY" else "TOO_LATE"
+		self:_log(combatant, false, reason, metrics, state.ArmedRevision)
+		self:_endAttempt(state, now)
+		return false
+	end
+	if not self.Combatants:IsAlive(combatant.Id) then
+		self:_log(combatant, false, "DEAD", nil, state.ArmedRevision)
+		self:_endAttempt(state, now)
+		return false
+	end
+	if self.Ball:GetTarget() ~= combatant then
+		self:_log(combatant, false, "NOT_TARGET", nil, state.ArmedRevision)
+		self:_endAttempt(state, now)
+		return false
+	end
+	if self.Ball:GetRevision() ~= state.ArmedRevision then
+		self:_log(combatant, false, "STALE_REVISION", nil, self.Ball:GetRevision())
+		self:_endAttempt(state, now)
+		return false
+	end
+	local metrics = self:_metrics(combatant)
+	if metrics.Closing <= Config.Parry.ApproachEpsilon then
+		self:_log(combatant, false, "TOO_LATE", metrics, state.ArmedRevision)
+		self:_endAttempt(state, now)
+		return false
+	end
+	if not metrics.InArc then
+		self:_log(combatant, false, "OUTSIDE_ARC", metrics, state.ArmedRevision)
+		self:_endAttempt(state, now)
+		return false
+	end
+	if metrics.Distance > Config.Parry.Range then return false end
+	if not self.Ball:Redirect(combatant, state.ArmedRevision) then
+		self:_log(combatant, false, "STALE_REVISION", metrics, self.Ball:GetRevision())
+		self:_endAttempt(state, now)
+		return false
+	end
+	self:_log(combatant, true, "PARRIED", metrics, state.ArmedRevision)
+	self:_endAttempt(state, now)
 	self.EffectRemote:FireAllClients({ Kind = "ParrySuccess", CombatantId = combatant.Id, Position = self.Ball:GetPosition(), RallyCount = self.Ball:GetRallyCount() })
 	return true
 end
@@ -115,10 +153,9 @@ function CombatService:TryParry(subject, context)
 	state.ActiveUntil = now + Config.Parry.ActiveWindow + compensation
 	state.ReadyAt = now + Config.Parry.Cooldown
 	state.ArmedRevision = observedRevision
-	self:_log(combatant, true, "ACCEPTED", metrics, observedRevision)
 	if combatant.Player then self.EffectRemote:FireClient(combatant.Player, { Kind = "ParryWindow", ActiveUntil = state.ActiveUntil, ReadyAt = state.ReadyAt }) end
-	self:TryConfirm(combatant, now)
-	return true, "ACCEPTED"
+	if self:TryConfirm(combatant, now) then return true, "PARRIED" end
+	return true, "ARMED"
 end
 
 return CombatService

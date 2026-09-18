@@ -28,9 +28,9 @@ local turned = trajectory.RotateTowards(roblox.Vector3.xAxis, roblox.Vector3.zAx
 check(math.abs(math.acos(turned:Dot(roblox.Vector3.xAxis)) - 0.2) < 1e-4, "turn interpolation respects angular limit")
 check(math.abs(trajectory.SegmentSphereTime(roblox.Vector3.new(-20, 0, 0), roblox.Vector3.new(40, 0, 0), roblox.Vector3.zero, 2) - 0.45) < 1e-6, "swept collision detects high-speed crossing")
 check(trajectory.SegmentSphereTime(roblox.Vector3.new(-20, 4, 0), roblox.Vector3.new(40, 0, 0), roblox.Vector3.zero, 2) == nil, "swept collision rejects miss")
-local capsuleHit = trajectory.SweptSphereVsVerticalCapsuleTime(roblox.Vector3.new(-30, 0, 0), roblox.Vector3.new(60, 0, 0), roblox.Vector3.zero, 2.35, 5.8, 2.25)
+local capsuleHit = trajectory.SweptSphereVsVerticalCapsuleTime(roblox.Vector3.new(-30, 0, 0), roblox.Vector3.new(60, 0, 0), roblox.Vector3.zero, 2.35, 5.8, 1.1)
 check(capsuleHit ~= nil and capsuleHit > 0 and capsuleHit < 1, "swept ball detects R15 capsule continuously")
-check(trajectory.SweptSphereVsVerticalCapsuleTime(roblox.Vector3.new(-30, 10, 0), roblox.Vector3.new(60, 0, 0), roblox.Vector3.zero, 2.35, 5.8, 2.25) == nil, "swept capsule rejects vertical miss")
+check(trajectory.SweptSphereVsVerticalCapsuleTime(roblox.Vector3.new(-30, 10, 0), roblox.Vector3.new(60, 0, 0), roblox.Vector3.zero, 2.35, 5.8, 1.1) == nil, "swept capsule rejects vertical miss")
 check(trajectory.IsWithinArc(roblox.Vector3.xAxis, roblox.Vector3.zero, roblox.Vector3.new(10, 0, 0), 165), "front point is inside parry arc")
 check(not trajectory.IsWithinArc(roblox.Vector3.xAxis, roblox.Vector3.zero, roblox.Vector3.new(-10, 0, 0), 165), "rear point is outside parry arc")
 check(math.abs(trajectory.ClosingSpeed(roblox.Vector3.new(-20, 0, 0), roblox.Vector3.xAxis, 100, roblox.Vector3.zero, roblox.Vector3.zero) - 100) < 1e-6, "closing velocity projects relative velocity toward target")
@@ -42,7 +42,7 @@ for _, speed in { 50, 100, 150, 200, 250, 300 } do
 	local detected = false
 	for _ = 1, 30 do
 		local delta = roblox.Vector3.xAxis * speed * dt
-		if trajectory.SweptSphereVsVerticalCapsuleTime(start, delta, roblox.Vector3.zero, 2.35, 5.8, 2.25) then detected = true; break end
+		if trajectory.SweptSphereVsVerticalCapsuleTime(start, delta, roblox.Vector3.zero, 2.35, 5.8, 1.1) then detected = true; break end
 		start += delta
 	end
 	check(detected, "continuous hurt volume prevents tunneling at " .. speed .. " studs/s")
@@ -53,7 +53,7 @@ for _, fps in { 30, 60, 120, 144 } do
 	local position = roblox.Vector3.new(-20, 0, 0)
 	for _ = 1, fps do
 		local delta = roblox.Vector3.xAxis * 100 * dt
-		local fraction = trajectory.SweptSphereVsVerticalCapsuleTime(position, delta, roblox.Vector3.zero, 2.35, 5.8, 2.25)
+		local fraction = trajectory.SweptSphereVsVerticalCapsuleTime(position, delta, roblox.Vector3.zero, 2.35, 5.8, 1.1)
 		if fraction then fpsHitPositions[fps] = (position + delta * fraction).X; break end
 		position += delta
 	end
@@ -62,6 +62,7 @@ end
 check(math.abs(fpsHitPositions[30] - fpsHitPositions[144]) < 1e-4, "continuous hit position is frame-rate invariant")
 
 local combatConfig = loadSource("src/shared/Config/CombatConfig.luau", {})
+check(combatConfig.Ball.Radius == 1.1 and combatConfig.Parry.Range > combatConfig.Ball.Radius * 10, "compact ball keeps an explicit forgiving defensive zone")
 local speed0 = combatConfig.SpeedForRally(0)
 local speed4 = combatConfig.SpeedForRally(4)
 local speed12 = combatConfig.SpeedForRally(12)
@@ -158,12 +159,44 @@ local Combat = loadSource("src/server/Combat/CombatService.luau", {
 local combat = Combat.new(combatantsStub, effects)
 combat:SetBall(ballStub)
 combat:SetPlaying(true)
-check(combat:TryParry(combatant, { ClientTime = now, BallRevision = 4 }), "valid player intent enters shared parry pipeline")
+local immediateSuccess, immediateReason = combat:TryParry(combatant, { ClientTime = now, BallRevision = 4 })
+check(immediateSuccess and immediateReason == "PARRIED", "valid in-range intent redirects immediately")
 check(redirects == 1 and combat:GetParryPhase(combatant.Id, now) == "Recovery", "parry confirms atomically and enters recovery")
 check(not combat:TryParry(combatant, { ClientTime = now, BallRevision = 4 }), "same revision cannot produce two parries")
 now += combatConfig.Parry.Cooldown + 0.01
 check(combat:GetParryPhase(combatant.Id, now) == "Idle", "parry state returns to Idle after cooldown")
 check(not combat:TryParry(combatant, { ClientTime = now, BallRevision = 3 }), "stale observed ball revision is rejected")
+
+local bufferedPosition = roblox.Vector3.new(combatConfig.Parry.Range + combatConfig.Ball.BaseSpeed * 0.1, 0, 0)
+local bufferedRevision = 9
+local bufferedRedirects = 0
+local bufferedCombatant = { Id = "P:8", Kind = "Player", Player = {}, Alive = true, RootPart = combatant.RootPart }
+local bufferedCombatants = {
+	Get = function(_, id) return if id == bufferedCombatant.Id then bufferedCombatant else nil end,
+	IsAlive = function(_, id) return id == bufferedCombatant.Id and bufferedCombatant.Alive end,
+}
+local bufferedBall = {
+	IsTracking = function() return true end,
+	GetTarget = function() return bufferedCombatant end,
+	GetRevision = function() return bufferedRevision end,
+	GetPosition = function() return bufferedPosition end,
+	GetSpeed = function() return combatConfig.Ball.BaseSpeed end,
+	GetRallyCount = function() return bufferedRedirects end,
+	GetKinematics = function() return bufferedPosition, roblox.Vector3.new(-1, 0, 0), combatConfig.Ball.BaseSpeed end,
+	Redirect = function(_, _, revision)
+		if revision ~= bufferedRevision or bufferedRedirects > 0 then return false end
+		bufferedRedirects += 1
+		return true
+	end,
+}
+local bufferedCombat = Combat.new(bufferedCombatants, effects)
+bufferedCombat:SetBall(bufferedBall)
+bufferedCombat:SetPlaying(true)
+local armed, armedReason = bufferedCombat:TryParry(bufferedCombatant, { ClientTime = now, BallRevision = bufferedRevision })
+check(armed and armedReason == "ARMED" and bufferedRedirects == 0, "slightly early intent arms a short server-authoritative buffer")
+bufferedPosition = roblox.Vector3.new(combatConfig.Parry.Range - 0.1, 0, 0)
+now += 0.1
+check(bufferedCombat:TryConfirm(bufferedCombatant, now) and bufferedRedirects == 1, "buffer confirms as soon as the approaching ball enters defensive range")
 
 local place = roblox.deserializePlace(fs.readFile("Fatal.rbxlx"))
 local actualGame = place:GetService("ReplicatedStorage").Game
@@ -191,12 +224,15 @@ local Ball = loadSource("src/server/Combat/BallService.luau", {
 	require = function(module) if module == ballConfigToken then return combatConfig elseif module == mathToken then return trajectory end; error("ball dependency") end,
 })
 local arena = place:GetService("Workspace").Game.Arena
-local ballCombat = { TryConfirm = function() return false end }
+local confirmationChecks = 0
+local ballCombat = { TryConfirm = function() confirmationChecks += 1; return false end }
 local snapshotRemote = { FireAllClients = function(_, payload) table.insert(snapshots, payload) end }
 local effectRemote = { FireAllClients = function() end }
 local ballService = Ball.new(ballCombatants, ballCombat, snapshotRemote, effectRemote, arena)
 ballService:Start()
 check(#ballService:_taggedBalls() == 1 and ballService._ball ~= nil, "round start creates exactly one authoritative ball")
+ballService:Update(0.01)
+check(confirmationChecks > 0, "ball simulation rechecks an armed parry before lethal contact")
 check(not pcall(function() ballService:Spawn() end), "duplicate ball guard fails clearly")
 local source = ballService:GetTarget()
 check(ballService:Redirect(source, ballService:GetRevision()), "valid redirect succeeds")

@@ -90,5 +90,6 @@ local weapon = replicated.Game.Assets.DefaultWeapon
 assert(weapon:IsA("Model") and weapon.Handle and weapon.Guard and weapon.Blade and weapon.PrimaryPart == weapon.Handle, "DefaultWeapon silhouette contract invalid")
 local ball = replicated.Game.Assets.FatalBall
 assert(ball:IsA("BasePart") and ball:FindFirstChildOfClass("Trail") and ball:FindFirstChild("CoreLight"), "Combat Lab ball contract invalid")
+assert((ball.Size - roblox.Vector3.one * 2.2).Magnitude < 1e-4, "Combat Lab ball visual must match the 1.1-stud authoritative radius")
 
 print(string.format("PASS: canonical_scripts=%d remotes=%d saved_balls=%d", expectedScriptCount, remoteCount, savedBalls))

@@ -74,6 +74,7 @@ function BallService:Spawn()
 	self:_assertBallCount(0)
 	local ball = ReplicatedStorage.Game.Assets.FatalBall:Clone()
 	ball.Name = "FatalBall"
+	ball.Size = Vector3.one * Config.Ball.Radius * 2
 	ball:SetAttribute("FatalAuthoritativeBall", true)
 	ball.CFrame = CFrame.new(self.Position)
 	ball.Parent = self.Gameplay
@@ -204,6 +205,8 @@ function BallService:Update(dt)
 	local substeps = math.clamp(math.ceil(self.Speed * boundedDt / Config.Ball.MaxTravelPerSubstep), 1, Config.Ball.MaxSubsteps)
 	local stepDt = boundedDt / substeps
 	for _ = 1, substeps do
+		if not self:IsTracking() or not self.CurrentTarget then break end
+		self.Combat:TryConfirm(self.CurrentTarget, now)
 		if not self:IsTracking() or not self.CurrentTarget then break end
 		local targetRoot = self.CurrentTarget.RootPart
 		local distance = (targetRoot.Position - self.Position).Magnitude
