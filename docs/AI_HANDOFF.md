@@ -1,173 +1,141 @@
 # FATAL — AI Handoff
 
-> Execution contract between reviewer/architect and Codex. Read `AGENTS.md`, this file, `docs/ARCHITECTURE.md`, then inspect the actual repository before changing code.
+> Execution contract between reviewer/architect and Codex. Git is the source of truth.
 
 ## Status
-**COMBAT LAB LOCK — REJECTED / RECOVERY REQUIRED**
+**COMBAT LAB LOCK — IMPLEMENTATION AUDITED / RUNTIME FEEL GATE ACTIVE**
 
-The latest presented result is NOT approved. Do not add features and do not self-approve this gate.
+Do not add features. Do not merge `codex/combat-lab-recovery` into `main` yet. Do not self-approve gameplay feel.
 
-## Why it was rejected
-The previous completion report described substantial static engineering but explicitly had no Roblox Studio runtime validation. More importantly, the delivered experience produced zero satisfaction in actual evaluation. Therefore static assertions, compile success, generated places, parameter tables and architectural sophistication are not evidence that the combat feels good.
+## Reviewed candidate
+Branch: `codex/combat-lab-recovery`
+Candidate commit: `d28227fe1bb270590aa76b1af9a2e5fa40c73b2f`
+Base reviewed: `origin/main` at `3de88142044ac557071fa3d82fc7966d68baddff`
 
-The previous report also referenced local paths under `C:/Users/KyDoCia/Desktop/DeathBall2/...` while claiming to implement FATAL. This is unacceptable provenance ambiguity for a repository that was intentionally created clean. From this point forward, the Git repository `KyDoCia/Fatal` is the source of truth.
+The reviewer inspected the actual branch implementation, including `BallService`, `CombatService`, `CombatantService`, `RoundService` and combat configuration. Repository recovery is complete enough to leave the recovery phase. The next blocker is no longer repository provenance; it is real gameplay/runtime feel.
 
-## New working rule: repository first
-Do not begin another large rewrite from an old local DeathBall2 tree.
+## Audit findings to preserve
+The candidate contains several foundations worth preserving unless Studio evidence proves otherwise:
+- Player registration identity is separated from round character binding/reset.
+- `RoundService` has a reentrancy guard around its update path.
+- Combat Lab is reduced to the Player / TrainingOpponent duel.
+- Ball ownership is centralized and duplicate authoritative-ball creation is guarded.
+- Player and NPC share the authoritative combat/parry service path.
+- Hit detection is based on swept/continuous geometry rather than `Touched` alone.
+- Cleanup paths explicitly stop the ball, clear NPCs and reset participant state.
+- Combat tuning is centralized rather than scattered through gameplay modules.
 
-First reconcile your working copy with `KyDoCia/Fatal`:
-1. Confirm the local Git remote points to `KyDoCia/Fatal`.
-2. Fetch current `origin/main`.
-3. Preserve useful uncommitted FATAL work deliberately; do not lose it and do not blindly overwrite main.
-4. Rebase/merge/cherry-pick as appropriate so the implementation being tested actually exists in the FATAL repository history.
-5. Commit and push the implementation to a dedicated branch based on current `origin/main`.
-6. Do not claim completion while the important implementation exists only as an uncommitted local working tree.
-7. Do not use or generate deliverables from `Desktop/DeathBall2` as the canonical FATAL project path. The canonical local checkout must be the FATAL repository.
+These are architectural foundations, not proof that the game feels good.
 
-If reconciliation is unsafe because local work conflicts with repository history, stop and report the exact Git state instead of improvising destructive commands.
+## Important audit concern: parry feel
+The current parry model is deliberately NOT approved yet.
+
+Current implementation accepts an input into an `Active` state, records an armed ball revision, and may confirm the parry later through `TryConfirm` when the ball reaches valid contact geometry. Therefore perceived timing is produced by the interaction of:
+- `Range`;
+- `ArcDegrees`;
+- `ActiveWindow`;
+- `InputBuffer`;
+- latency compensation;
+- closing speed;
+- ball revision;
+- later contact/confirmation.
+
+This can be a valid architecture, but it can also create a disconnected feeling where the player's click and the visible deflection do not feel like the same event. Studio playtesting must decide this. Do not add more timing machinery before testing it.
+
+Current values such as `Range = 11`, `ArcDegrees = 165`, `ActiveWindow = 0.24`, `InputBuffer = 0.07`, `Cooldown = 0.58`, ball radius `2.25`, hurt radius `2.35`, `BaseSpeed = 55`, `MaxSpeed = 270` and `RallyGrowth = 0.11` remain hypotheses only.
 
 ## Product rule
-**No feature work until the basic 1v1 is genuinely enjoyable in Studio.**
+**No new feature until Player <-> Ball <-> TrainingOpponent is genuinely satisfying.**
 
 Frozen: inventory, lootboxes, shop, economy, DataStore progression, powers, abilities, dash, cosmetics, ranked, quests, battle pass, finishers, social systems, additional NPCs, final map art, cinematic polish and lobby expansion.
 
-## This sprint has one objective
-Make the smallest possible playable loop worthy of tuning:
+## NEXT TASK — runtime feel validation build
+Do NOT redesign the combat again from static reasoning.
 
-`Player <-> Ball <-> TrainingOpponent`
+Prepare the existing candidate for the shortest possible HUMAN Studio tuning session.
 
-Exactly:
-- 1 Player;
-- 1 R15 TrainingOpponent;
-- 1 authoritative gameplay ball;
-- one clean test arena;
-- parry;
-- redirect;
-- rally;
-- hit/elimination;
-- fast deterministic reset.
+### 1. Synchronize safely
+Start from `codex/combat-lab-recovery` at candidate commit `d28227fe1bb270590aa76b1af9a2e5fa40c73b2f`.
+Fetch `origin/main` and read this updated handoff. Bring only this handoff change into the working branch as appropriate. Do not merge the implementation into main.
 
-Do not optimize for feature count or impressive report length.
+### 2. Do not broaden implementation
+Do not add systems. Do not rewrite BallService/CombatService merely to appear productive. Only make changes required to make the runtime test reliable, immediate and observable.
 
-## Preserve good engineering, remove speculative complexity
-Inspect the implementation that actually reaches the FATAL branch. Preserve sound pieces such as continuous collision, server authority, shared Combatant rules and deterministic cleanup if they are correct.
+### 3. Make normal playtest clean
+Default Studio playtest must show exactly:
+- one Player;
+- one `TrainingOpponent` R15;
+- one gameplay ball;
+- minimal readable arena;
+- minimal combat UI/feedback;
+- fast restart after a miss.
 
-However, do NOT treat previous tuning numbers as requirements. Values such as 11-stud parry range, 165-degree arc, 0.24-second active window, capsule dimensions, redirect ratios, turn rates and speed curves are hypotheses only. They may be changed or simplified when playtesting shows they feel bad.
+Debug geometry/logging must be OFF by default but easy to enable with one config toggle.
 
-Do not add more mathematical systems merely because they sound sophisticated. Every system in the hot gameplay path must solve an observed gameplay problem.
+### 4. Make tuning observable
+When `CombatDebug = true`, ensure one parry attempt can be understood without per-frame spam. The tester needs concise evidence for:
+- ACCEPT/REJECT;
+- rejection reason;
+- distance;
+- TTI/closing speed when applicable;
+- ball revision;
+- current parry phase.
 
-## Immediate technical checks
-Before tuning feel, verify in the repository implementation:
-- duplicate Player Combatant registration is actually fixed at the lifecycle root;
-- round/lab preparation cannot re-enter while yielding;
-- Player identity is registered once and rebound/reset between rounds rather than recreated incorrectly;
-- exactly one TrainingOpponent exists;
-- exactly one authoritative gameplay ball exists;
-- reset is idempotent and does not accumulate connections/state;
-- Player and NPC reach the same authoritative parry validation path;
-- high-speed contact uses continuous/swept detection rather than `Touched` alone;
-- no runtime bootstrap depends on stale DeathBall2 paths/assets/hierarchy.
+If these already work correctly, preserve them rather than rewriting.
 
-## Gameplay philosophy
-The test must be readable without spectacle.
+### 5. Do not tune blindly
+Do not change parry range/window/arc, hurt volume, speed curve, turn rate, redirect momentum or NPC timing unless required to fix an objective runtime defect discovered while preparing the test.
 
-A successful parry should feel:
-- immediate on input;
-- visually connected to the incoming ball;
-- forgiving enough to feel fair but not automatic;
-- forceful on redirect;
-- deterministic enough that the player understands why success/failure occurred.
+The human tester will provide observations such as:
+- parry feels early/late;
+- click-to-deflect feels disconnected;
+- hit feels larger/smaller than visual body;
+- ball curves unnaturally;
+- redirect lacks force;
+- rally accelerates too slowly/quickly;
+- NPC feels impossible/trivial;
+- reset breaks after repetitions.
 
-A failed parry should feel explainable. If the player visually believes they hit the timing but the server rejects it repeatedly, the current tuning/model is wrong even if the math is internally consistent.
+Those observations will drive the next tuning commit.
 
-Do not hide poor timing behind huge hitboxes. Do not hide poor redirect behind VFX. Do not hide lifecycle bugs behind guards.
+### 6. Runtime truth
+If you cannot actually launch Roblox Studio, state `RUNTIME NOT TESTED`. Static verification does not become runtime evidence.
 
-## Minimal presentation only
-During this recovery sprint:
-- simple readable arena;
-- readable ball core/trail;
-- one clean weapon placeholder if required for animation readability;
-- short parry feedback;
-- short hit feedback;
-- minimal target/rally UI;
-- debug visuals available behind a development toggle, OFF by default for normal feel testing.
+## Human test protocol
+The build should make this easy:
 
-No visual-content sprint.
+1. Open the canonical FATAL checkout/`Fatal.rbxlx` in Roblox Studio.
+2. Press Play.
+3. Confirm exactly one TrainingOpponent and one ball.
+4. Play at least 10–20 duel resets at normal network conditions.
+5. Judge only: input response, visible parry timing, hit fairness, trajectory, redirect force, rally pacing, NPC timing, reset reliability.
+6. If something feels wrong, enable `CombatDebug` and reproduce it; capture the rejection reason/metrics rather than guessing.
+7. Only after baseline feel is understandable should latency emulation at 50/100/150 ms be attempted.
 
-## Runtime is the gate
-Static verification remains useful, but the next meaningful evidence must come from Roblox Studio.
+## Acceptance
+This gate cannot be approved by Codex.
 
-Codex may execute whatever static tests are available, but if Codex cannot launch/play Roblox Studio, it must say `RUNTIME NOT TESTED` and stop short of declaring gameplay quality.
+It advances only after human Studio feedback confirms either:
+A. the baseline duel feels good enough to tune incrementally, or
+B. specific reproducible feel defects are identified with enough evidence for a targeted tuning/fix sprint.
 
-The human playtest is authoritative for feel.
-
-## Required human playtest loop
-Prepare the project so the tester can launch and immediately repeat this loop without waiting through product systems:
-1. Player spawns.
-2. One TrainingOpponent spawns.
-3. One ball begins the duel quickly.
-4. Player parries to NPC.
-5. NPC can parry back.
-6. Rally accelerates enough to expose timing/trajectory issues.
-7. Miss causes a clear elimination.
-8. Duel resets quickly.
-9. Repeat many times without duplicate state or runtime errors.
-
-## Tuning instrumentation
-Keep diagnostics concise and useful. For each rejected/accepted parry in debug mode, expose the small set of facts needed to tune it: result/reason, distance, closing velocity or TTI when useful, current ball revision and relevant timing state.
-
-Do not flood Output every frame.
-
-Debug geometry should make hurt/parry regions inspectable when requested, but normal playtest mode must remain visually clean.
-
-## Acceptance for this sprint
-This sprint is NOT approved by Codex.
-
-It is ready for human evaluation only when:
-- the implementation is committed/pushed to the FATAL repository branch;
-- project builds from that FATAL checkout;
-- exactly one NPC and one gameplay ball are expected;
-- no known duplicate lifecycle bug remains;
-- normal test mode is clean and debug can be toggled separately;
-- the tester has a simple command/workflow to sync/build/open the correct FATAL place;
-- Codex clearly distinguishes static checks from Studio runtime.
-
-The final quality gate remains human Studio playtesting.
-
-## Next task
-**Repository recovery + smallest playable Combat Lab.**
-
-Work from the current `KyDoCia/Fatal` repository, reconcile the existing Combat Lab implementation into a dedicated branch based on current `origin/main`, audit it against the immediate technical checks above, simplify anything speculative that is not helping the core duel, and prepare a clean 1v1 build for human Studio testing.
-
-Do NOT add a new feature. Do NOT start visual polish. Do NOT expand scope. Do NOT self-approve gameplay feel.
-
-## Completion report — keep it short
-Return only:
+## Completion report
+Keep it extremely short:
 
 ### Git
-- canonical local repository path;
-- remote URL/name confirmation;
-- branch;
-- commit SHA pushed;
-- whether branch is based on current `origin/main`.
+branch + pushed SHA.
 
-### Core loop
-- one paragraph describing Player -> Ball -> NPC -> reset.
+### Test readiness
+exactly what the human should open and whether debug defaults OFF.
 
-### Fixes
-- root-cause fixes made, especially lifecycle/reentrancy/duplicate state.
-
-### Tuning changed
-- only values/algorithms actually changed and why.
+### Changes
+only changes actually necessary after reading this handoff; `none` is acceptable.
 
 ### Verification
-- static commands actually executed and results.
-- `RUNTIME TESTED: ...` or `RUNTIME NOT TESTED`.
+static commands actually run and result.
+`RUNTIME TESTED: ...` or `RUNTIME NOT TESTED`.
 
-### Human test
-- exact shortest steps to open/sync the correct FATAL project and test the duel.
+### Human action
+one-line instruction to start the duel.
 
-### Known blockers
-- real unresolved blockers only.
-
-Stop after this report. Do not implement the next task.
+Then STOP. Do not propose or implement another feature.
