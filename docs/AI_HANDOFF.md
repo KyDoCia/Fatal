@@ -3,244 +3,209 @@
 > Execution contract between reviewer/architect and Codex. Git is the source of truth.
 
 ## Status
-**COMBAT LAB LOCK — CURRENT COMBAT REJECTED / CLEAN CORE REWRITE AUTHORIZED**
+**COMBAT LAB LOCK — V2 INTERACTION WORKS, GAME FEEL FAILED**
 
-The human Studio playtest has rejected the current combat system as a whole. This is no longer a tuning sprint.
+Do not add features. Do not merge to main. Continue from `codex/combat-core-v2` and preserve the simple V2 hot path unless an observed defect requires changing it.
 
-Do not add product features. Do not merge the rejected combat implementation into `main`. Preserve repository history so rollback/comparison remains possible.
+Latest V2 candidate audited: `c12bfe9538885baa26463603eae4d3321d7034d4`.
 
-## Human evidence
-Latest Studio evaluation:
-- gameplay is still extremely poor;
-- interacting/parrying the ball is not intuitive or satisfying;
-- presentation around the combat is noisy and obstructive (`FIGHT`, `CRITICAL`, TTI/debug-like information dominate the screen);
-- the ball still reads as oversized/heavy relative to the desired clean duel;
-- incremental tuning is no longer desired.
+## Human playtest — authoritative evidence
+V2 improved one important thing: the Player can now actually parry the ball.
 
-The tester explicitly requests a complete combat-system rebuild.
+However the overall gameplay is still rejected. Specific observations:
+1. TrainingOpponent does not parry with absolute reliability, so rallies end before the core loop can be evaluated properly.
+2. The ball still LOOKS extremely large in Studio despite `CombatConfig.Ball.Radius = 0.85`; therefore the visual asset/part sizing pipeline must be audited instead of merely changing the config radius.
+3. Player does not spawn/orient facing the duel/ball/opponent, adding unnecessary cognitive work immediately.
+4. Too much information is presented/processable during the duel; normal gameplay must be visually near-empty.
+5. Gameplay feels slow and weak: ball travel, redirect and rally escalation lack urgency/impact.
 
-## Decision
-Stop patching the existing parry architecture.
+These are concrete playtest failures. Fix them directly. Do not add speculative systems.
 
-The current chain built around armed `Active` state + later contact confirmation has accumulated too many interacting conditions before the basic interaction was proven. Do not preserve it merely because tests exist.
+## Audited V2 baseline
+Current config at the audited candidate:
+- Ball Radius: `0.85`
+- BaseSpeed: `50`
+- MaxSpeed: `200`
+- SpeedPerRally: `7`
+- HomingRate: `2.4`
+- DefensiveRadius: `12`
+- Cooldown: `0.32`
+- NPC ReactionRadius: `11.5`
+- NPC ReactionMin/Max: `0.03 / 0.06`
+- NPC MissChance: `0.04`
 
-Keep only infrastructure that is independently useful and verified: canonical Rojo hierarchy, one-Player/one-NPC Combat Lab bootstrapping, R15 character binding, cleanup/lifecycle foundations, and generic utilities that do not dictate rejected combat behavior.
+Current `CombatCore:TryParry` is intentionally simple and should remain understandable: active -> alive -> target -> cooldown -> approaching -> range -> immediate redirect. Do not reintroduce the rejected armed-window/contact-confirm architecture.
 
-Replace the hot combat path with a deliberately smaller architecture.
+## NEXT TASK — V2 FEEL PASS 1: FAST, CLEAN, RELIABLE DUEL
 
-## NEXT TASK — COMBAT CORE V2 FROM FIRST PRINCIPLES
+### 1. Continue on the V2 branch
+Fetch `origin/main`, read this handoff, incorporate only the handoff update into `codex/combat-core-v2`, and continue there. Do not merge V2 into main.
 
-Work on a NEW branch based on current `origin/main`, named approximately `codex/combat-core-v2`. Do not build V2 on top of the rejected combat branch. If useful infrastructure must be reused, port/cherry-pick only the minimal files or concepts deliberately after inspection.
+### 2. TrainingOpponent must parry 100% for this test
+For this specific Combat Lab phase, the NPC is an instrument, not an opponent.
 
-### Goal
-Create the smallest high-quality duel possible:
+Set its intentional miss chance to ZERO and make its decision timing deterministic/reliable enough that, when it is alive/targeted and the ball enters its valid defensive condition, it calls the SAME authoritative `CombatCore:TryParry` path and succeeds essentially every valid return.
 
-`Player -> incoming ball -> intuitive parry -> immediate redirect -> NPC -> return -> rally`
+Do not give it direct `Ball:Redirect` access. Do not create a second combat rule.
 
-Exactly one Player, one TrainingOpponent, one ball.
+If it can still fail due to its decision polling skipping the valid range at high speed, fix the decision trigger robustly (for example using predicted crossing/continuous approach information) rather than giving the NPC a secret giant parry radius.
 
-### Delete complexity from the hot path
-V2 must NOT start with the old multi-phase parry state machine.
+Goal: during this phase, only the human should normally break the rally. This gives us a stable training wall for evaluating Player feel.
 
-Do not begin with:
-- `Idle -> Active -> Recovery -> Cooldown` as the authority model;
-- armed revision waiting for later contact;
-- multiple overlapping timing gates;
-- TTI as a required parry gate;
-- sword mesh collision;
-- client-authoritative success;
-- giant invisible hitboxes;
-- complex prediction;
-- spectacle/UI compensating for weak mechanics.
+### 3. Audit why the ball LOOKS huge
+`Radius = 0.85` in config did not produce a visually compact projectile in the actual Studio playtest.
 
-Add complexity later only when a real playtest demonstrates the need.
+Trace the full visual pipeline:
+- `assets/CombatBall.rbxm` dimensions;
+- clone/spawn code;
+- any `Size`, scale, mesh scale, adornment, glow or secondary sphere;
+- whether config radius is applied as radius or diameter;
+- any generated asset script that can overwrite dimensions;
+- whether the built `Fatal.rbxlx` contains a stale oversized asset.
 
-### V2 parry semantics
-Start from this simple server-authoritative rule:
+Fix the ROOT CAUSE.
 
-When the targeted Player presses parry, the server evaluates the CURRENT authoritative ball state immediately.
+Target visual read: roughly a small projectile/orb, clearly smaller than the avatar torso/head silhouette. Start around a visible diameter of ~1.2–1.6 studs unless the asset construction requires another coherent value.
 
-Accept when all are true:
-1. duel is active;
-2. actor is alive and is the current target;
-3. ball exists and is moving toward actor;
-4. ball is inside a generous but explicit defensive radius;
-5. parry is not on a simple cooldown.
+Authoritative collision radius should remain explicit and coherent; do not hide a huge collision sphere inside a tiny visual.
 
-If accepted, redirect the ball immediately in that same authoritative action and increment rally/revision.
+### 4. Spawn/orient the duel correctly
+At every duel start/reset:
+- Player and TrainingOpponent spawn at deliberate opposing positions;
+- both face each other horizontally;
+- camera/player immediately has the duel in front of them;
+- initial ball spawn/target is inside that readable forward field.
 
-No `arm now, confirm later when contact happens` in V2 baseline.
+Do not require the human to turn around or search for the ball at round start.
 
-If the Player presses slightly before the ball enters range, it may fail initially. Do not solve that with a complex buffer until human testing shows one is necessary. We need to understand the raw interaction first.
+Use a deterministic `lookAt`/yaw orientation based on the opponent position while preserving sensible Y/up orientation.
 
-### Defensive geometry
-Use one simple defensive radius around a stable R15 reference point (HRP/torso-derived center) for V2 baseline.
+### 5. Remove cognitive noise
+Normal gameplay (`CombatDebug = false`) should be nearly empty.
 
-No frontal arc in the first V2 candidate unless an objective exploit makes it necessary.
+Keep at most:
+- one SMALL rally counter;
+- one subtle target cue only if necessary for clarity.
 
-The player should not need to point the sword tip at the ball. Facing is presentation, not authority.
+Remove/hide during normal Combat Lab play:
+- giant FIGHT text;
+- giant CRITICAL text;
+- TTI numbers;
+- debug boxes/volumes;
+- labels floating over the character;
+- redundant status text;
+- any persistent instruction that competes with watching the ball.
 
-Initial hypothesis: defensive radius around 10–14 studs. Centralize it. This is intentionally forgiving for the first feel test.
+The player's eyes should naturally track only: opponent, ball, weapon/character.
 
-### Ball visual/collision size
-Make the ball visually compact.
+### 6. Make the duel faster and stronger
+The current `50 + 7/rally` baseline is too weak according to playtest.
 
-Initial authoritative radius hypothesis: about 0.75–1.0 stud. Visual diameter should read roughly like a compact projectile, not a giant orb beside an R15 avatar.
+For Feel Pass 1, deliberately move toward a faster arcade cadence while keeping the first return readable.
 
-Keep authoritative collision and visual size coherent. Do not hide a huge gameplay sphere inside a tiny visual.
+Starting hypotheses to test statically/build around:
+- BaseSpeed: approximately `70–80` studs/s;
+- SpeedPerRally: approximately `10–14` studs/s;
+- MaxSpeed: approximately `240–280` studs/s.
 
-### Hit semantics
-Parry radius and hurt collision are separate.
+Choose coherent values in that range; centralize them.
 
-For a missed parry, retain a small predictable R15 body hurt volume and continuous/swept ball collision so high-speed balls do not tunnel.
+Do not simply make the first ball lethal-fast. The intended curve is:
+- first incoming ball: obvious/readable;
+- first successful redirect: clearly stronger/faster than the incoming ball;
+- rallies 2–5: rapidly become exciting;
+- later rally: high pressure.
 
-Do not use `Touched` as sole authority.
+If a linear function cannot produce this feel cleanly, a tiny two-stage or multiplicative function is acceptable, but keep it understandable. Do not recreate a large tuning system.
 
-### Ball movement V2
-Keep movement simple and readable:
-- server authoritative;
-- current target;
-- position + velocity;
-- bounded homing toward target;
-- continuous collision;
-- wall bounce only if it already works cleanly and does not complicate the duel.
+### 7. Redirect must communicate FORCE
+On Player parry, the ball should not feel like it gently changes destination.
 
-Do not implement advanced target leading in the first candidate.
+Preserve immediate authoritative redirect, but make the outgoing event feel decisive:
+- outgoing direction should establish immediately toward the other combatant;
+- speed escalation applies immediately;
+- visual trail can react instantly;
+- optional tiny local camera/FOV impulse is acceptable;
+- optional very short hit-stop-like presentation on the client is acceptable ONLY if it does not delay authority/input.
 
-At low rally the trajectory should be easy to read.
+No giant VFX. No screen obstruction. We want kinetic force, not spectacle.
 
-### Redirect V2
-On accepted parry:
-- choose the other combatant in 1v1;
-- set a strong outgoing direction toward that target;
-- apply speed for the new rally;
-- redirect immediately;
-- replicate feedback.
+### 8. Keep Player parry simple
+Do NOT make the Player parry harder in this sprint.
 
-The first V2 candidate may intentionally use a stronger/direct redirect than realistic momentum. Responsiveness and causality matter more than preserving the rejected momentum model.
+Keep the simple V2 semantics and approximately generous defensive radius unless testing/code inspection exposes a concrete bug. We already proved this version can connect; preserve that gain.
 
-### Rally V2
-Use a tiny understandable speed function. No elaborate piecewise model.
+No frontal arc. No sword-tip collision. No active/recovery state machine. No TTI gate for the Player.
 
-Start approximately:
-- base speed: 45–55 studs/s;
-- small increase each successful exchange;
-- cap initially around 180–220 studs/s for the first feel test.
+### 9. Camera/readability
+Do not build a camera system. Only fix obvious readability issues.
 
-The first 3–5 exchanges must be easy enough to learn the timing.
+At duel start, the default view must make opponent/ball direction obvious. On successful parry, a very small short-lived feedback impulse is allowed. No constant shake and no aggressive FOV animation.
 
-### Cooldown
-Use only a simple anti-spam cooldown initially, roughly 0.25–0.4 seconds. Centralize it.
-
-No recovery/active/buffer state machine until playtesting justifies it.
-
-### NPC V2
-Exactly one `TrainingOpponent` R15.
-
-It uses the SAME server `TryParry` rule as the Player.
-
-Its decision layer may call `TryParry` when the incoming ball crosses a reaction threshold. Give it enough imperfection to miss sometimes, but for the first candidate prioritize sustaining rallies so the human can test repeated returns.
-
-No complex movement AI. Stationary or tiny repositioning is acceptable.
-
-### Input
-PC baseline:
-- MouseButton1;
-- F.
-
-Client sends only parry intent. Local input may play a tiny immediate animation/feedback, but server decides success.
-
-### UI — remove the noise
-For V2 baseline remove/hide the giant combat overlays seen in the failed playtest.
-
-Normal play should NOT show giant `FIGHT`, `CRITICAL`, TTI numbers, debug boxes, or large target text over the character.
-
-Normal UI should be nearly empty:
-- small rally counter at top if useful;
-- optional subtle target cue only if truly necessary.
-
-`CombatDebug = false` by default.
-
-Debug information must never be part of the normal gameplay presentation.
-
-### Weapon
-Weapon is visual only. Keep one clean placeholder sword if needed, but do not let its mesh/hitbox determine parry success.
-
-### Arena
-Do not build a map. Use a clean flat test arena with enough contrast to see the ball.
-
-### Reset/lifecycle
-Reuse or rebuild the already-correct lifecycle principles:
-- Player logical combatant registered once;
-- one NPC;
-- one ball;
-- deterministic cleanup;
-- quick reset after elimination;
-- no accumulated connections/instances.
-
-### Code architecture
-V2 should be small enough that the entire hot path is easy to reason about.
-
-Prefer a few focused modules over abstraction for its own sake. The reviewer should be able to trace:
-`input -> server TryParry -> immediate validation -> redirect`
-without jumping through a large state machine.
-
-### Tests
-Write/retain focused tests for invariants, not to justify feel:
-- one authoritative ball;
-- incoming-direction test;
-- defensive-radius accept/reject;
-- cooldown;
-- immediate redirect;
+### 10. Preserve engineering invariants
+- exactly one Player combatant;
+- exactly one TrainingOpponent;
+- exactly one authoritative ball;
+- server authoritative success;
+- Player/NPC same `TryParry`;
 - swept hurt collision;
-- cleanup/reset;
-- Player/NPC shared TryParry path.
+- deterministic reset;
+- no accumulated connections;
+- `CombatDebug = false` by default.
 
-Do not recreate dozens of tests for speculative mechanics that V2 does not contain.
+## Required verification
+Update focused tests only for changed invariants:
+- NPC intentional miss chance is zero in Combat Lab;
+- NPC can reliably trigger the shared parry path across representative ball speeds;
+- ball asset/part visible size matches intended dimensions after build;
+- duel spawn orientations face each other;
+- normal UI does not instantiate/show rejected overlays;
+- speed curve values are bounded by max;
+- existing one-ball/reset/parry tests continue passing.
 
-### Runtime truth
-If Roblox Studio is not actually run, report `RUNTIME NOT TESTED`.
+Static verification is NOT approval of feel.
 
-Static compile/build is not gameplay validation.
+## Human acceptance test
+The next candidate is ready for human evaluation when:
+1. Spawn/reset immediately points the Player into the duel.
+2. The ball visually reads SMALL, not like a large black sphere beside the avatar.
+3. NPC reliably returns every valid ball during training; rallies normally end because the Player misses.
+4. Screen is clean enough that the ball is the primary information source.
+5. First ball is readable but noticeably more energetic than the previous candidate.
+6. Player parry immediately produces a stronger/faster return.
+7. By rallies ~3–5 the exchange clearly feels faster and more exciting.
+8. Player can still successfully parry with the simple V2 rule.
+9. Miss/hit/reset remain coherent and fast.
+10. No red runtime errors during the normal loop.
 
-## Human acceptance test for V2 candidate
-The candidate is ready for human evaluation when:
-1. Play immediately gives 1 Player, 1 NPC, 1 compact ball.
-2. No giant `FIGHT`/`CRITICAL`/TTI overlays obstruct gameplay.
-3. The first ball approaches slowly/readably.
-4. Pressing F/click while the approaching ball is visibly within the defensive zone produces an immediate redirect.
-5. The NPC can return it.
-6. Several low-rally exchanges are realistically achievable.
-7. Pressing obviously too early/out of range fails.
-8. Missing produces a coherent body hit.
-9. Reset is fast and clean.
-10. Repeating does not duplicate Player/NPC/ball/state.
-
-The human tester — not Codex — decides whether V2 is enjoyable enough to iterate.
+The human tester decides whether Feel Pass 1 passes.
 
 ## Frozen scope
-No inventory, lootboxes, shop, economy, DataStore, powers, abilities, dash, cosmetics, ranked, quests, battle pass, finishers, social, additional NPCs, final map, lobby expansion or cinematic polish.
+No inventory, lootboxes, shop, economy, DataStore, powers, abilities, dash, cosmetics, ranked, quests, battle pass, finishers, social systems, additional NPCs, final map art, lobby expansion or cinematic polish.
 
 ## Completion report
-Keep it short:
+Keep it short.
 
 ### Git
-new branch + pushed SHA + base main SHA.
+branch + pushed SHA.
 
-### What was replaced
-old hot-path pieces deliberately not carried into V2.
+### Ball visual root cause
+Why `Radius = 0.85` still looked huge and exact fix.
 
-### V2 hot path
-one concise trace from input to redirect.
+### NPC reliability
+How 100% training parry is achieved while still using shared `TryParry`.
 
-### Current tuning
-ball radius, defensive radius, base/max speed, speed growth, cooldown, NPC reaction values.
+### Orientation / UI
+What changed to make the duel immediately readable and screen clean.
+
+### Feel tuning
+Only changed speed/redirect/camera values and rationale.
 
 ### Verification
-commands/tests actually run and result.
+Tests actually executed and results.
 `RUNTIME TESTED: ...` or `RUNTIME NOT TESTED`.
 
-### Human test
-shortest exact steps to open the V2 build and play.
+### Human action
+Open the correct V2 `Fatal.rbxlx` and test 10–20 rallies.
 
-STOP after this report. Do not add the next feature and do not self-approve V2.
+STOP. Do not add features and do not self-approve.
