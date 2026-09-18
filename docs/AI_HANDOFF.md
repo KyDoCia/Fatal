@@ -1,338 +1,173 @@
 # FATAL — AI Handoff
 
-> This file is the execution contract between the architect/reviewer and Codex. Codex reads it before implementation. Codex must not mark its own work approved or advance the gate. The reviewer updates this file after repository review and Studio evidence.
+> Execution contract between reviewer/architect and Codex. Read `AGENTS.md`, this file, `docs/ARCHITECTURE.md`, then inspect the actual repository before changing code.
 
 ## Status
-**COMBAT LAB LOCK — ACTIVE**
+**COMBAT LAB LOCK — REJECTED / RECOVERY REQUIRED**
 
-No new product features until the core 1v1 is explicitly approved after Roblox Studio playtesting.
+The latest presented result is NOT approved. Do not add features and do not self-approve this gate.
 
-## Product objective
-FATAL is currently a combat laboratory, not a content-complete game.
+## Why it was rejected
+The previous completion report described substantial static engineering but explicitly had no Roblox Studio runtime validation. More importantly, the delivered experience produced zero satisfaction in actual evaluation. Therefore static assertions, compile success, generated places, parameter tables and architectural sophistication are not evidence that the combat feels good.
 
-The only experience that matters in this gate is:
+The previous report also referenced local paths under `C:/Users/KyDoCia/Desktop/DeathBall2/...` while claiming to implement FATAL. This is unacceptable provenance ambiguity for a repository that was intentionally created clean. From this point forward, the Git repository `KyDoCia/Fatal` is the source of truth.
 
-`1 Player -> 1 TrainingOpponent (R15) -> 1 authoritative ball -> target -> parry -> redirect -> rally -> hit/elimination -> fast clean reset -> repeat`
+## New working rule: repository first
+Do not begin another large rewrite from an old local DeathBall2 tree.
 
-The loop should be good enough to play repeatedly for several minutes because the interaction itself feels precise, responsive, readable and satisfying — not because VFX hides weak mechanics.
+First reconcile your working copy with `KyDoCia/Fatal`:
+1. Confirm the local Git remote points to `KyDoCia/Fatal`.
+2. Fetch current `origin/main`.
+3. Preserve useful uncommitted FATAL work deliberately; do not lose it and do not blindly overwrite main.
+4. Rebase/merge/cherry-pick as appropriate so the implementation being tested actually exists in the FATAL repository history.
+5. Commit and push the implementation to a dedicated branch based on current `origin/main`.
+6. Do not claim completion while the important implementation exists only as an uncommitted local working tree.
+7. Do not use or generate deliverables from `Desktop/DeathBall2` as the canonical FATAL project path. The canonical local checkout must be the FATAL repository.
 
-## Active gate
-### Combat Lab Quality Gate
-Focus only on:
-- deterministic Combatant lifecycle;
-- exactly one Player and one TrainingOpponent participating;
-- exactly one authoritative gameplay ball;
-- server-authoritative parry validation;
-- continuous/swept collision at high ball speeds;
-- separate hurt volume and parry volume/window;
-- approach direction and parry arc validation;
-- stable ball simulation across frame rates;
-- momentum-aware homing and redirect;
-- rally/speed progression;
-- bounded latency tolerance and stale-request protection;
-- NPC using the same `CombatService:TryParry` path as a Player;
-- idempotent cleanup/reset;
-- minimal clean HUD/camera/VFX;
-- strong debug instrumentation for tuning.
+If reconciliation is unsafe because local work conflicts with repository history, stop and report the exact Git state instead of improvising destructive commands.
 
-## Blocking runtime issue
-Latest real Studio evidence showed:
+## Product rule
+**No feature work until the basic 1v1 is genuinely enjoyable in Studio.**
 
-`ServerScriptService.Game.Combat.CombatantService:17: duplicate combatant id: P:<UserId>`
+Frozen: inventory, lootboxes, shop, economy, DataStore progression, powers, abilities, dash, cosmetics, ranked, quests, battle pass, finishers, social systems, additional NPCs, final map art, cinematic polish and lobby expansion.
 
-Observed stack:
-- `CombatantService:_register`
-- `CombatantService:RegisterPlayer`
-- `RoundService:_readyPlayer`
-- `RoundService:_prepare`
-- `RoundService:Update`
-- `GameServer`
+## This sprint has one objective
+Make the smallest possible playable loop worthy of tuning:
 
-This is a blocker.
+`Player <-> Ball <-> TrainingOpponent`
 
-### Required root-cause rule
-Do not merely ignore duplicate registration.
+Exactly:
+- 1 Player;
+- 1 R15 TrainingOpponent;
+- 1 authoritative gameplay ball;
+- one clean test arena;
+- parry;
+- redirect;
+- rally;
+- hit/elimination;
+- fast deterministic reset.
 
-Registration and round preparation must be separate lifecycle concepts.
+Do not optimize for feature count or impressive report length.
 
-Expected direction:
-- `PlayerAdded -> RegisterPlayer` once for server membership;
-- round preparation retrieves/rebinds/resets the existing Combatant;
-- respawn updates character references without creating a second logical Player Combatant;
-- `PlayerRemoving -> Unregister`;
-- TrainingOpponent is registered once for its lifetime and unregistered when destroyed.
+## Preserve good engineering, remove speculative complexity
+Inspect the implementation that actually reaches the FATAL branch. Preserve sound pieces such as continuous collision, server authority, shared Combatant rules and deterministic cleanup if they are correct.
 
-Codex must inspect the actual current lifecycle and implement the correct solution rather than blindly matching this sketch.
+However, do NOT treat previous tuning numbers as requirements. Values such as 11-stud parry range, 165-degree arc, 0.24-second active window, capsule dimensions, redirect ratios, turn rates and speed curves are hypotheses only. They may be changed or simplified when playtesting shows they feel bad.
 
-## Combat Lab mode
-Provide a development configuration such as `CombatLab = true`.
+Do not add more mathematical systems merely because they sound sophisticated. Every system in the hot gameplay path must solve an observed gameplay problem.
 
-When enabled in Studio:
-1. Player becomes ready.
-2. Exactly one R15 `TrainingOpponent` exists.
-3. Exactly one gameplay ball exists while combat is active.
-4. Combat begins quickly without a long lobby/intermission.
-5. On elimination, cleanup occurs.
-6. After a short reset (~1.5s is a starting point), the same test loop can run again.
-7. Repeating the loop must not accumulate Combatants, NPCs, balls, connections, callbacks, or stale state.
+## Immediate technical checks
+Before tuning feel, verify in the repository implementation:
+- duplicate Player Combatant registration is actually fixed at the lifecycle root;
+- round/lab preparation cannot re-enter while yielding;
+- Player identity is registered once and rebound/reset between rounds rather than recreated incorrectly;
+- exactly one TrainingOpponent exists;
+- exactly one authoritative gameplay ball exists;
+- reset is idempotent and does not accumulate connections/state;
+- Player and NPC reach the same authoritative parry validation path;
+- high-speed contact uses continuous/swept detection rather than `Touched` alone;
+- no runtime bootstrap depends on stale DeathBall2 paths/assets/hierarchy.
 
-## Test arena
-Keep the arena deliberately simple during this gate:
-- flat readable floor;
-- simple collision walls;
-- roughly 100–140 studs across;
-- Player/NPC initial separation roughly 35–50 studs;
-- no decorative geometry that obscures collision or trajectory.
+## Gameplay philosophy
+The test must be readable without spectacle.
 
-Gameplay quality is the purpose of this arena.
+A successful parry should feel:
+- immediate on input;
+- visually connected to the incoming ball;
+- forgiving enough to feel fair but not automatic;
+- forceful on redirect;
+- deterministic enough that the player understands why success/failure occurred.
 
-## Ball invariants
-- Server owns gameplay truth.
-- Exactly one authoritative gameplay ball during active Combat Lab combat.
-- Zero stale authoritative balls after cleanup.
-- Ball state should expose concepts equivalent to position, velocity/current direction, desired direction, speed, target, rally count, and revision.
-- Do not use `Touched` as the sole hit authority.
-- Movement and collision must not depend materially on client FPS.
+A failed parry should feel explainable. If the player visually believes they hit the timing but the server rejects it repeatedly, the current tuning/model is wrong even if the math is internally consistent.
 
-### Continuous collision
-Use swept/continuous collision from previous to next simulated position, including the ball radius. High-speed tests must not tunnel through the target.
+Do not hide poor timing behind huge hitboxes. Do not hide poor redirect behind VFX. Do not hide lifecycle bugs behind guards.
 
-Test at minimum the mathematical behavior around 50, 100, 150, 200, 250 and 300 studs/s.
-
-## Hurt geometry
-Hurt detection and parry detection are different systems.
-
-For R15 competitive consistency, use a predictable mathematical body volume (for example a capsule/cylinder-style approximation around torso/root) rather than per-limb physics as gameplay authority.
-
-Centralize tuning values such as:
-- ball radius;
-- player hit radius;
-- player hit height.
-
-The chosen model and values must be documented in the implementation report.
-
-## Parry geometry and timing
-Parry validation should account for:
-- participant alive/eligible;
-- current target;
-- round/lab state;
-- ball revision;
-- cooldown/state machine;
-- proximity;
-- ball approaching the defender;
-- a coherent frontal defensive arc;
-- timing/window/buffer;
-- bounded latency tolerance.
-
-Starting tuning targets (not immutable requirements):
-- range: ~10–12 studs;
-- defensive arc: ~150–180 degrees;
-- input buffer: ~0.06–0.08s;
-- maximum bounded latency compensation: ~0.10–0.12s.
-
-Do not make physical sword contact the gameplay authority. Animation represents the action; server mathematics decides success.
-
-## Parry state
-Prefer an explicit state model equivalent to:
-`Idle -> Active -> Recovery -> Cooldown -> Idle`
-
-Avoid contradictory boolean state spread across modules.
-
-## Ball revision / stale requests
-Every meaningful redirect/parry state change must invalidate stale parry attempts through a revision/token or equivalent mechanism. A delayed request must not parry a ball state that has already been redirected.
-
-## Homing and redirect
-The ball must not snap its direction directly to `HumanoidRootPart` every frame.
-
-Maintain current and desired direction, with bounded convergence. At higher speed, avoid impossible-looking curvature. Limited target-velocity leading may be used, but do not create perfect predictive aimbot behavior.
-
-On successful parry, the redirect should feel forceful: establish the new target/direction strongly, then let normal homing continue while retaining coherent momentum.
-
-## Rally
-Speed progression should be centralized and non-linear rather than an unbounded constant increment.
-
-Desired feel:
-- rally 0–3: controlled/readable;
-- 4–8: clearly fast;
-- 9–14: very fast;
-- 15+: extreme but still deterministic.
-
-A starting max-speed exploration range around 240–280 studs/s is acceptable, but tuning must be based on playtesting rather than treating these numbers as final.
-
-## TrainingOpponent
-Exactly one NPC during this gate.
-
-It must:
-- be R15;
-- use the Combatant abstraction;
-- become the real ball target;
-- use the same server combat rules as the Player;
-- call an internal authoritative path such as `CombatService:TryParry`, never fake a redirect and never use a client RemoteEvent;
-- use TTI/closing velocity/reaction delay/timing variance rather than a perfect distance trigger;
-- be capable of both successful parries and believable mistakes;
-- use only minimal movement/short repositioning during this gate.
-
-For 1v1 targeting, a successful Player parry targets the NPC and a successful NPC parry targets the Player. Preserve an API that can later support more Combatants without adding them now.
-
-## TTI / approach
-For threat estimation, account for closing velocity rather than using only `distance / speed`.
-
-Conceptually:
-- derive vector to target/contact volume;
-- project ball velocity toward it;
-- if closing speed is non-positive, the ball is not directly approaching;
-- use distance-to-contact / closing speed for approximate TTI.
-
-TTI can inform NPC decisions, UI and debugging. It is not a substitute for authoritative swept hit detection.
-
-## Minimal presentation
-Do not hide mechanics behind spectacle.
-
-During this gate:
-- clean ball core + readable trail;
-- short parry flash/ring;
+## Minimal presentation only
+During this recovery sprint:
+- simple readable arena;
+- readable ball core/trail;
+- one clean weapon placeholder if required for animation readability;
+- short parry feedback;
 - short hit feedback;
-- base FOV around 70;
-- small parry FOV punch;
-- very light critical-target feedback;
-- minimal HUD: rally and discreet target state; optional TTI in debug.
+- minimal target/rally UI;
+- debug visuals available behind a development toggle, OFF by default for normal feel testing.
 
-No cinematic polish sprint yet.
+No visual-content sprint.
 
-## Required debug instrumentation
-Provide a `CombatDebug` development toggle.
+## Runtime is the gate
+Static verification remains useful, but the next meaningful evidence must come from Roblox Studio.
 
-When enabled, make the combat math inspectable where practical:
-- ball radius;
-- hurt volume;
-- parry range/arc;
-- current target;
-- velocity vector;
-- closing velocity;
-- TTI;
-- rally count;
-- ball revision;
-- parry state.
+Codex may execute whatever static tests are available, but if Codex cannot launch/play Roblox Studio, it must say `RUNTIME NOT TESTED` and stop short of declaring gameplay quality.
 
-Parry attempts should produce one controlled diagnostic record with a standardized reason such as:
-`NOT_TARGET`, `DEAD`, `COOLDOWN`, `TOO_EARLY`, `TOO_LATE`, `OUT_OF_RANGE`, `OUTSIDE_ARC`, `NOT_APPROACHING`, `STALE_REVISION`, `ACCEPTED`.
+The human playtest is authoritative for feel.
 
-Do not log per-frame spam.
+## Required human playtest loop
+Prepare the project so the tester can launch and immediately repeat this loop without waiting through product systems:
+1. Player spawns.
+2. One TrainingOpponent spawns.
+3. One ball begins the duel quickly.
+4. Player parries to NPC.
+5. NPC can parry back.
+6. Rally accelerates enough to expose timing/trajectory issues.
+7. Miss causes a clear elimination.
+8. Duel resets quickly.
+9. Repeat many times without duplicate state or runtime errors.
 
-## Required automated/static tests
-Add or maintain focused tests for:
-1. swept/segment collision math;
-2. ball vs hurt-volume collision;
-3. parry arc;
-4. closing velocity;
-5. TTI;
-6. wall reflection;
-7. high-speed collision/tunneling;
-8. ball revision/stale attempt;
-9. duplicate parry protection;
-10. parry state transitions;
-11. Combatant registration lifecycle;
-12. Combat Lab cleanup/reset;
-13. trajectory/hit behavior across representative 30/60/120/144 FPS timesteps.
+## Tuning instrumentation
+Keep diagnostics concise and useful. For each rejected/accepted parry in debug mode, expose the small set of facts needed to tune it: result/reason, distance, closing velocity or TTI when useful, current ball revision and relevant timing state.
 
-Static tests are necessary but never substitute for Studio runtime testing.
+Do not flood Output every frame.
 
-## Studio acceptance tests
-The reviewer/user will run these after implementation:
+Debug geometry should make hurt/parry regions inspectable when requested, but normal playtest mode must remain visually clean.
 
-A. Enter Combat Lab and see exactly one TrainingOpponent.
-B. Exactly one gameplay ball exists.
-C. Ball targets the Player correctly.
-D. Player parry responds immediately and redirects to NPC.
-E. NPC can parry through the same combat rules.
-F. A rally can continue repeatedly and speed grows predictably.
-G. Lateral movement does not produce obviously incorrect hits.
-H. Clearly early parry is rejected appropriately.
-I. Clearly late parry is rejected appropriately.
-J. Invalid rear/out-of-arc parry is rejected appropriately.
-K. Visual contact and authoritative hit remain coherent.
-L. High-speed ball does not tunnel through a target.
-M. Wall bounce remains deterministic and readable.
-N. Elimination triggers a fast clean reset.
-O. Repeat at least 20 resets without duplicate Combatants/NPCs/balls/connections.
-P. Roblox Studio Output contains zero red runtime errors during the normal loop.
-Q. Later latency tuning will be checked under 0/50/100/150ms network conditions; do not claim this is validated unless actually tested.
+## Acceptance for this sprint
+This sprint is NOT approved by Codex.
 
-## Explicitly frozen scope
-Until this gate is approved, do not implement or expand:
-- inventory;
-- lootboxes;
-- shop;
-- currency/economy;
-- DataStore progression;
-- abilities/powers;
-- dash;
-- skins/rarities;
-- ranked;
-- quests;
-- battle pass;
-- finishers;
-- social systems;
-- complex lobby;
-- final arena art;
-- additional NPCs;
-- cinematic polish intended to mask core feel problems.
+It is ready for human evaluation only when:
+- the implementation is committed/pushed to the FATAL repository branch;
+- project builds from that FATAL checkout;
+- exactly one NPC and one gameplay ball are expected;
+- no known duplicate lifecycle bug remains;
+- normal test mode is clean and debug can be toggled separately;
+- the tester has a simple command/workflow to sync/build/open the correct FATAL place;
+- Codex clearly distinguishes static checks from Studio runtime.
 
-Existing unrelated code does not need destructive deletion merely to satisfy this list, but it must not distract from or interfere with Combat Lab.
+The final quality gate remains human Studio playtesting.
 
 ## Next task
-**Fix the duplicate Player Combatant lifecycle bug first, then implement/refine the Combat Lab described above. Do not advance beyond this gate.**
+**Repository recovery + smallest playable Combat Lab.**
 
-Before coding, inspect the current repository implementation and identify the real root cause of duplicate registration. Preserve good existing work where compatible rather than rewriting blindly.
+Work from the current `KyDoCia/Fatal` repository, reconcile the existing Combat Lab implementation into a dedicated branch based on current `origin/main`, audit it against the immediate technical checks above, simplify anything speculative that is not helping the core duel, and prepare a clean 1v1 build for human Studio testing.
 
-## Codex completion report contract
-When this task is complete, report:
+Do NOT add a new feature. Do NOT start visual polish. Do NOT expand scope. Do NOT self-approve gameplay feel.
 
-### Duplicate Combatant
-Exact root cause and lifecycle correction.
+## Completion report — keep it short
+Return only:
 
-### Combat Lab
-How it starts, resets and guarantees one NPC/one ball.
+### Git
+- canonical local repository path;
+- remote URL/name confirmation;
+- branch;
+- commit SHA pushed;
+- whether branch is based on current `origin/main`.
 
-### Hit Detection
-Exact mathematical model and continuous collision approach.
+### Core loop
+- one paragraph describing Player -> Ball -> NPC -> reset.
 
-### Hurt Volume
-Shape/dimensions/current tuning.
+### Fixes
+- root-cause fixes made, especially lifecycle/reentrancy/duplicate state.
 
-### Parry Volume
-Range, arc, timing, approach validation and state model.
+### Tuning changed
+- only values/algorithms actually changed and why.
 
-### Ball Simulation
-Timestep/substep strategy and high-speed behavior.
+### Verification
+- static commands actually executed and results.
+- `RUNTIME TESTED: ...` or `RUNTIME NOT TESTED`.
 
-### Redirect / Homing
-Current algorithm and tuning points.
+### Human test
+- exact shortest steps to open/sync the correct FATAL project and test the duel.
 
-### Latency
-What is implemented versus what still requires Studio network emulation.
+### Known blockers
+- real unresolved blockers only.
 
-### TrainingOpponent
-Reaction/decision model and confirmation that it uses the shared combat path.
-
-### Debug
-How to enable it and interpret rejection reasons/geometry.
-
-### Tests
-Only tests actually executed, with results.
-
-### Runtime
-Write exactly one:
-- `RUNTIME TESTED: <how and evidence>`
-- `RUNTIME NOT TESTED`
-
-### Files changed
-Exact list.
-
-### Current tuning
-Central parameters and values.
-
-### Known problems
-Real unresolved problems only.
-
-Stop there. Do not implement a next feature or self-approve the Combat Lab gate.
+Stop after this report. Do not implement the next task.
