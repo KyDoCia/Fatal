@@ -54,10 +54,12 @@ end
 
 function CombatService:_log(combatant, accepted, reason, metrics, revision)
 	if not (Config.DebugCombat or Config.CombatDebug) then return end
-	print(string.format("[PARRY] actor=%s result=%s reason=%s distance=%.2f tti=%s closing=%.2f revision=%d",
+	local state = combatant and self.ParryStates[combatant.Id]
+	local phase = state and state.Phase or "Idle"
+	print(string.format("[PARRY] actor=%s result=%s reason=%s distance=%.2f tti=%s closing=%.2f revision=%d phase=%s",
 		combatant and combatant.Kind or "Unknown", accepted and "ACCEPT" or "REJECT", reason,
 		metrics and metrics.Distance or -1, metrics and metrics.TTI < math.huge and string.format("%.3f", metrics.TTI) or "INF",
-		metrics and metrics.Closing or -1, revision or -1))
+		metrics and metrics.Closing or -1, revision or -1, phase))
 end
 
 function CombatService:_reject(combatant, reason, metrics, revision)
