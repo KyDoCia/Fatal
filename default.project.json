@@ -1,0 +1,58 @@
+{
+  "name": "FatalCombatCoreV2",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$ignoreUnknownInstances": false,
+      "Game": {
+        "$className": "Folder",
+        "$ignoreUnknownInstances": false,
+        "Remotes": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": false,
+          "ParryIntent": { "$className": "RemoteEvent" },
+          "BallSnapshot": { "$className": "RemoteEvent" },
+          "CombatEvent": { "$className": "RemoteEvent" }
+        },
+        "Shared": { "$path": "src/shared" },
+        "Assets": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": false,
+          "CombatBall": { "$path": "assets/CombatBall.rbxm" }
+        }
+      }
+    },
+    "ServerScriptService": {
+      "$ignoreUnknownInstances": false,
+      "Game": {
+        "$className": "Folder",
+        "$ignoreUnknownInstances": false,
+        "GameServer": { "$path": "src/server/GameServer.server.luau" },
+        "CombatantRegistry": { "$path": "src/server/CombatantRegistry.luau" },
+        "CombatCore": { "$path": "src/server/CombatCore.luau" },
+        "BallCore": { "$path": "src/server/BallCore.luau" },
+        "TrainingOpponent": { "$path": "src/server/TrainingOpponent.luau" },
+        "DuelService": { "$path": "src/server/DuelService.luau" }
+      }
+    },
+    "StarterPlayer": {
+      "$properties": { "GameSettingsAvatar": "R15" },
+      "StarterPlayerScripts": {
+        "$ignoreUnknownInstances": false,
+        "Game": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": false,
+          "ClientBootstrap": { "$path": "src/client/ClientBootstrap.client.luau" }
+        }
+      }
+    },
+    "StarterGui": {
+      "$ignoreUnknownInstances": false,
+      "$properties": { "ResetPlayerGuiOnSpawn": false },
+      "RallyGui": { "$path": "assets/RallyGui.rbxm" }
+    },
+    "Workspace": {
+      "Game": { "$path": "assets/World.rbxm" }
+    }
+  }
+}
