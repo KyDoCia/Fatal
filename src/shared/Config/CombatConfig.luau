@@ -1,7 +1,7 @@
 local Config = {
 	CombatDebug = false,
 	Ball = {
-		Radius = 0.7,
+		Radius = 0.55,
 		SpawnHeight = 5,
 		BaseSpeed = 70,
 		MaxSpeed = 260,

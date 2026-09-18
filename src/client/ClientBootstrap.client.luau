@@ -1,7 +1,5 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
@@ -41,26 +39,6 @@ end)
 
 combatEvent.OnClientEvent:Connect(function(event)
 	if type(event) ~= "table" or event.Kind ~= "Parry" or typeof(event.Position) ~= "Vector3" then return end
-	local flash = Instance.new("Part")
-	flash.Name = "V2ParryFeedback"
-	flash.Shape = Enum.PartType.Ball
-	flash.Size = Vector3.one * 1.2
-	flash.Position = event.Position
-	flash.Color = Color3.fromRGB(235, 242, 255)
-	flash.Material = Enum.Material.Neon
-	flash.Anchored = true
-	flash.CanCollide = false
-	flash.CanQuery = false
-	flash.CanTouch = false
-	flash.Parent = workspace
-	TweenService:Create(flash, TweenInfo.new(0.1), { Size = Vector3.one * 2.4, Transparency = 1 }):Play()
-	Debris:AddItem(flash, 0.15)
-	local camera = workspace.CurrentCamera
-	if camera and event.ActorId == "P:" .. player.UserId then
-		local restingFov = camera.FieldOfView
-		camera.FieldOfView = restingFov + 2.5
-		TweenService:Create(camera, TweenInfo.new(0.12), { FieldOfView = restingFov }):Play()
-	end
 	local trail = currentBall and currentBall:FindFirstChildOfClass("Trail")
 	if trail then
 		trailPulse += 1

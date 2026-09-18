@@ -52,6 +52,7 @@
       "RallyGui": { "$path": "assets/RallyGui.rbxm" }
     },
     "Workspace": {
+	  "$ignoreUnknownInstances": false,
       "Game": { "$path": "assets/World.rbxm" }
     }
   }

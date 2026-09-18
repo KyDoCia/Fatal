@@ -26,6 +26,7 @@ end
 
 local world = Instance.new("Folder")
 world.Name = "Game"
+world:SetAttribute("FatalRuntimeContract", "CombatCoreV2CleanRoom")
 local arena = Instance.new("Model")
 arena.Name = "Arena"
 arena.Parent = world
@@ -43,15 +44,17 @@ spawns.Parent = gameplay
 for index, x in { -20, 20 } do
 	local position = Vector3.new(x, 0.1, 0)
 	local spawn = part(string.format("Spawn%02d", index), Vector3.new(3, 0.2, 3), CFrame.lookAt(position, Vector3.new(0, 0.1, 0)), Color3.fromRGB(70, 75, 86), spawns)
-	spawn.Transparency = 0.75
+	spawn.Transparency = 1
 	spawn.CanCollide = false
+	spawn.CanTouch = false
+	spawn.CanQuery = false
 end
 fs.writeFile("assets/World.rbxm", roblox.serializeModel({ world }))
 
 local ball = Instance.new("Part")
 ball.Name = "CombatBall"
 ball.Shape = Enum.PartType.Ball
-ball.Size = Vector3.one * 1.4
+ball.Size = Vector3.one * 1.1
 ball.Color = Color3.fromRGB(238, 54, 66)
 ball.Material = Enum.Material.Neon
 ball.Anchored = true
@@ -59,10 +62,10 @@ ball.CanCollide = false
 ball.CanTouch = false
 ball.CanQuery = false
 local top = Instance.new("Attachment")
-top.Position = Vector3.new(0, 0.32, 0)
+top.Position = Vector3.new(0, 0.25, 0)
 top.Parent = ball
 local bottom = Instance.new("Attachment")
-bottom.Position = Vector3.new(0, -0.32, 0)
+bottom.Position = Vector3.new(0, -0.25, 0)
 bottom.Parent = ball
 local trail = Instance.new("Trail")
 trail.Attachment0 = top

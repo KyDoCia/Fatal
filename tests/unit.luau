@@ -13,7 +13,7 @@ local function load(path, environment)
 end
 
 local config = load("src/shared/Config/CombatConfig.luau", {})
-check(config.Ball.Radius == 0.7 and config.Parry.DefensiveRadius == 12, "V2 compact ball and defensive radius are explicit")
+check(config.Ball.Radius == 0.55 and config.Parry.DefensiveRadius == 12, "V2 compact ball and defensive radius are explicit")
 check(config.SpeedForRally(0) == 70 and config.SpeedForRally(3) == 106 and config.SpeedForRally(100) == 260, "V2 rally speed is linear and capped")
 check(config.NPC.MissChance == 0 and config.NPC.ReactionDelay == 0, "Combat Lab NPC has deterministic zero-miss reaction")
 
