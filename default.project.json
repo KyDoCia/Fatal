@@ -1,0 +1,109 @@
+{
+  "name": "Fatal",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$ignoreUnknownInstances": false,
+      "Game": {
+        "$className": "Folder",
+        "$ignoreUnknownInstances": false,
+        "Remotes": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": false,
+          "Combat": {
+            "$className": "Folder",
+            "$ignoreUnknownInstances": false,
+            "ParryRequest": { "$className": "RemoteEvent" },
+            "BallSnapshot": { "$className": "RemoteEvent" },
+            "CombatEffect": { "$className": "RemoteEvent" }
+          },
+          "Round": {
+            "$className": "Folder",
+            "$ignoreUnknownInstances": false,
+            "RoundState": { "$className": "RemoteEvent" }
+          }
+        },
+        "Shared": { "$path": "src/shared" },
+        "Assets": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": false,
+          "FatalBall": { "$path": "assets/FatalBall.rbxm" },
+          "DefaultWeapon": { "$path": "assets/DefaultWeapon.rbxm" }
+        }
+      }
+    },
+    "ServerScriptService": {
+      "$ignoreUnknownInstances": false,
+      "Game": {
+        "$className": "Folder",
+        "$ignoreUnknownInstances": false,
+        "GameServer": { "$path": "src/server/GameServer.server.luau" },
+        "Combat": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": false,
+          "CombatantService": { "$path": "src/server/Combat/CombatantService.luau" },
+          "CombatService": { "$path": "src/server/Combat/CombatService.luau" },
+          "BallService": { "$path": "src/server/Combat/BallService.luau" },
+          "WeaponService": { "$path": "src/server/Combat/WeaponService.luau" }
+        },
+        "NPC": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": false,
+          "NPCService": { "$path": "src/server/NPC/NPCService.luau" },
+          "NPCCombatController": { "$path": "src/server/NPC/NPCCombatController.luau" }
+        },
+        "Rounds": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": false,
+          "RoundService": { "$path": "src/server/Rounds/RoundService.luau" }
+        }
+      }
+    },
+    "StarterPlayer": {
+      "$properties": { "GameSettingsAvatar": "R15" },
+      "StarterPlayerScripts": {
+        "$ignoreUnknownInstances": false,
+        "Game": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": false,
+          "ClientBootstrap": { "$path": "src/client/ClientBootstrap.client.luau" },
+          "ClientState": { "$path": "src/client/ClientState.luau" },
+          "UI": { "$path": "src/client/UI" },
+          "Combat": {
+            "$className": "Folder",
+            "$ignoreUnknownInstances": false,
+            "InputController": { "$path": "src/client/Combat/InputController.luau" },
+            "CombatController": { "$path": "src/client/Combat/CombatController.luau" },
+            "CombatEffectsController": { "$path": "src/client/Combat/CombatEffectsController.luau" },
+            "CameraFeedbackController": { "$path": "src/client/Combat/CameraFeedbackController.luau" },
+            "CombatDebugController": { "$path": "src/client/Combat/CombatDebugController.luau" }
+          }
+        }
+      }
+    },
+    "StarterGui": {
+      "$ignoreUnknownInstances": false,
+      "$properties": { "ResetPlayerGuiOnSpawn": false },
+      "HUD": { "$path": "assets/HUD.rbxm" },
+      "RoundGui": { "$path": "assets/RoundGui.rbxm" },
+      "CombatGui": { "$path": "assets/CombatGui.rbxm" }
+    },
+    "Workspace": {
+      "Game": { "$path": "assets/World.rbxm" }
+    },
+    "Lighting": {
+      "$properties": {
+        "Ambient": [0.32, 0.32, 0.34],
+        "OutdoorAmbient": [0.45, 0.45, 0.47],
+        "Brightness": 2,
+        "ClockTime": 14,
+        "EnvironmentDiffuseScale": 0.5,
+        "EnvironmentSpecularScale": 0.35,
+        "ExposureCompensation": 0,
+        "GlobalShadows": true,
+        "ShadowSoftness": 0.5,
+        "Technology": "Future"
+      }
+    }
+  }
+}

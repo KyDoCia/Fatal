@@ -5,3 +5,5 @@ Thumbs.db
 *.rbxm
 *.rbxmx
 sourcemap.json
+!assets/
+!assets/*.rbxm

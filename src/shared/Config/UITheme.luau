@@ -1,0 +1,22 @@
+return table.freeze({
+	Background = Color3.fromRGB(7, 8, 11),
+	Panel = Color3.fromRGB(18, 20, 25),
+	TextPrimary = Color3.fromRGB(242, 242, 238),
+	TextSecondary = Color3.fromRGB(139, 145, 155),
+	Threat = Color3.fromRGB(194, 49, 57),
+	Critical = Color3.fromRGB(255, 42, 51),
+	Accent = Color3.fromRGB(227, 231, 235),
+	Stroke = Color3.fromRGB(76, 81, 91),
+	CornerRadius = UDim.new(0, 3),
+	Transparency = 0.18,
+	FontScale = 1,
+	Motion = {
+		Fast = 0.12,
+		Standard = 0.2,
+		Slow = 0.34,
+		CountdownScale = 1.18,
+		TargetPulseScale = 1.08,
+		CriticalPulseScale = 1.045,
+		ParryPulseScale = 1.12,
+	},
+})
