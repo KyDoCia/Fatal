@@ -1,211 +1,184 @@
 # FATAL — AI Handoff
 
-> Execution contract between reviewer/architect and Codex. Git is the source of truth.
+> Git is the source of truth. Human Studio playtest is the authority for gameplay quality.
 
-## Status
-**COMBAT LAB LOCK — V2 INTERACTION WORKS, GAME FEEL FAILED**
+## STATUS
+**V2 FEEL PASS 1 — HARD REJECTED**
 
-Do not add features. Do not merge to main. Continue from `codex/combat-core-v2` and preserve the simple V2 hot path unless an observed defect requires changing it.
+Latest tested candidate: `codex/combat-core-v2` @ `a2c35a79a4bea84ff21560923369b3c612126e4f`.
 
-Latest V2 candidate audited: `c12bfe9538885baa26463603eae4d3321d7034d4`.
+The candidate is mechanically more functional than earlier versions, but the human Studio test still rates the experience at effectively zero quality/gameplay satisfaction.
 
-## Human playtest — authoritative evidence
-V2 improved one important thing: the Player can now actually parry the ball.
+Do not merge it to `main`. Do not add features. Do not attempt to rescue this by adding more HUD, VFX, camera systems, state machines or tuning tables.
 
-However the overall gameplay is still rejected. Specific observations:
-1. TrainingOpponent does not parry with absolute reliability, so rallies end before the core loop can be evaluated properly.
-2. The ball still LOOKS extremely large in Studio despite `CombatConfig.Ball.Radius = 0.85`; therefore the visual asset/part sizing pipeline must be audited instead of merely changing the config radius.
-3. Player does not spawn/orient facing the duel/ball/opponent, adding unnecessary cognitive work immediately.
-4. Too much information is presented/processable during the duel; normal gameplay must be visually near-empty.
-5. Gameplay feels slow and weak: ball travel, redirect and rally escalation lack urgency/impact.
+## VISUAL EVIDENCE FROM STUDIO
+The latest screenshot still shows exactly the kind of presentation the handoff prohibited:
+- giant `FIGHT` overlay;
+- `CRITICAL` text;
+- floating `0.12` timing/TTI-like information;
+- a large rectangular debug/target region around the avatar;
+- red floor/target geometry and a large glowing red marker competing with the ball;
+- the ball still visually reads much larger/heavier than the intended compact projectile;
+- the screen's attention hierarchy is wrong: UI/debug/markers dominate instead of ball -> opponent -> player action.
 
-These are concrete playtest failures. Fix them directly. Do not add speculative systems.
+Therefore either the normal/debug separation is still broken OR the built `Fatal.rbxlx` still contains stale scripts/UI from the rejected implementation. Treat this as a build/provenance failure until proven otherwise.
 
-## Audited V2 baseline
-Current config at the audited candidate:
-- Ball Radius: `0.85`
-- BaseSpeed: `50`
-- MaxSpeed: `200`
-- SpeedPerRally: `7`
-- HomingRate: `2.4`
-- DefensiveRadius: `12`
-- Cooldown: `0.32`
-- NPC ReactionRadius: `11.5`
-- NPC ReactionMin/Max: `0.03 / 0.06`
-- NPC MissChance: `0.04`
+## DECISION
+Before changing game feel again, make the runtime candidate CLEAN and MINIMAL.
 
-Current `CombatCore:TryParry` is intentionally simple and should remain understandable: active -> alive -> target -> cooldown -> approaching -> range -> immediate redirect. Do not reintroduce the rejected armed-window/contact-confirm architecture.
+The next build must contain only the V2 duel presentation we intend to evaluate. If old UI/scripts are surviving because Rojo/build output preserves stale instances, fix the build pipeline/root place rather than hiding them at runtime.
 
-## NEXT TASK — V2 FEEL PASS 1: FAST, CLEAN, RELIABLE DUEL
+## NEXT TASK — V2 CLEAN ROOM RUNTIME
 
-### 1. Continue on the V2 branch
-Fetch `origin/main`, read this handoff, incorporate only the handoff update into `codex/combat-core-v2`, and continue there. Do not merge V2 into main.
+Continue on `codex/combat-core-v2`, but rebuild the playable runtime candidate from a clean canonical place/tree.
 
-### 2. TrainingOpponent must parry 100% for this test
-For this specific Combat Lab phase, the NPC is an instrument, not an opponent.
+### 1. Prove what is producing the rejected overlays
+Search the ENTIRE repository and generated place pipeline for the runtime producers of:
+- `FIGHT`;
+- `CRITICAL`;
+- TTI/timing number labels such as the visible `0.12`;
+- target/debug rectangles;
+- red target floor boxes;
+- large red glowing ground marker;
+- any old CombatDebug/Threat/TargetIndicator/CombatGui systems.
 
-Set its intentional miss chance to ZERO and make its decision timing deterministic/reliable enough that, when it is alive/targeted and the ball enters its valid defensive condition, it calls the SAME authoritative `CombatCore:TryParry` path and succeeds essentially every valid return.
+Do not assume `CombatDebug = false` is sufficient. Identify the exact Instance/script/module responsible for each visible element.
 
-Do not give it direct `Ball:Redirect` access. Do not create a second combat rule.
+If any producer exists only inside a stale base `.rbxlx`, remove it from the canonical base/build path.
 
-If it can still fail due to its decision polling skipping the valid range at high speed, fix the decision trigger robustly (for example using predicted crossing/continuous approach information) rather than giving the NPC a secret giant parry radius.
+### 2. Clean canonical build
+`Fatal.rbxlx` must be produced from a clean V2 source of truth, not by overlaying V2 onto a contaminated old place that retains rejected scripts/UI.
 
-Goal: during this phase, only the human should normally break the rally. This gives us a stable training wall for evaluating Player feel.
+Audit `default.project.json`, build scripts, generated assets and base-place behavior.
 
-### 3. Audit why the ball LOOKS huge
-`Radius = 0.85` in config did not produce a visually compact projectile in the actual Studio playtest.
+After build, inspect/audit the resulting place and assert that rejected legacy names/scripts/UI are absent.
 
-Trace the full visual pipeline:
-- `assets/CombatBall.rbxm` dimensions;
-- clone/spawn code;
-- any `Size`, scale, mesh scale, adornment, glow or secondary sphere;
-- whether config radius is applied as radius or diameter;
-- any generated asset script that can overwrite dimensions;
-- whether the built `Fatal.rbxlx` contains a stale oversized asset.
+Do not merely disable them. For the V2 Combat Lab candidate they should not exist in the built runtime unless they are explicitly development-only and guaranteed not to instantiate in normal play.
 
-Fix the ROOT CAUSE.
+### 3. Normal runtime presentation = almost nothing
+For this candidate normal gameplay should show only:
+- Roblox CoreGui;
+- a SMALL rally counter.
 
-Target visual read: roughly a small projectile/orb, clearly smaller than the avatar torso/head silhouette. Start around a visible diameter of ~1.2–1.6 studs unless the asset construction requires another coherent value.
+Nothing else persistent.
 
-Authoritative collision radius should remain explicit and coherent; do not hide a huge collision sphere inside a tiny visual.
+No FIGHT.
+No CRITICAL.
+No TTI.
+No target boxes.
+No floor target markers.
+No glowing ground marker.
+No debug geometry.
+No labels above/beside characters.
+No instructions during the duel.
 
-### 4. Spawn/orient the duel correctly
-At every duel start/reset:
-- Player and TrainingOpponent spawn at deliberate opposing positions;
-- both face each other horizontally;
-- camera/player immediately has the duel in front of them;
-- initial ball spawn/target is inside that readable forward field.
+The ball itself is the targeting information for this 1v1 test.
 
-Do not require the human to turn around or search for the ball at round start.
+### 4. Ball must be visually tiny and unambiguous
+The screenshot still reads the black ball as too large.
 
-Use a deterministic `lookAt`/yaw orientation based on the opponent position while preserving sensible Y/up orientation.
+For this clean-room candidate, reduce visible diameter aggressively to about `1.0–1.2 studs` (radius `0.5–0.6`) and verify the ACTUAL built Part/Mesh dimensions in `Fatal.rbxlx`.
 
-### 5. Remove cognitive noise
-Normal gameplay (`CombatDebug = false`) should be nearly empty.
+Collision radius must be coherent with the visual ball. Player defensive parry radius remains separate and forgiving.
 
-Keep at most:
-- one SMALL rally counter;
-- one subtle target cue only if necessary for clarity.
+Remove excessive dark/glossy visual mass if it makes the projectile read larger than its geometry. Keep a simple high-contrast core and restrained trail.
 
-Remove/hide during normal Combat Lab play:
-- giant FIGHT text;
-- giant CRITICAL text;
-- TTI numbers;
-- debug boxes/volumes;
-- labels floating over the character;
-- redundant status text;
-- any persistent instruction that competes with watching the ball.
+### 5. Strip combat feedback to causality only
+No cinematic feedback pass.
 
-The player's eyes should naturally track only: opponent, ball, weapon/character.
+Successful parry may have only:
+- immediate direction reversal/redirect;
+- immediate speed change;
+- tiny trail pulse;
+- one subtle short sound/flash if already available and clean.
 
-### 6. Make the duel faster and stronger
-The current `50 + 7/rally` baseline is too weak according to playtest.
+Temporarily REMOVE the FOV punch if it adds noise. We first need to judge trajectory/timing alone.
 
-For Feel Pass 1, deliberately move toward a faster arcade cadence while keeping the first return readable.
+### 6. Duel framing
+Player and NPC must be placed in a simple straight readable lane at reset and face each other.
 
-Starting hypotheses to test statically/build around:
-- BaseSpeed: approximately `70–80` studs/s;
-- SpeedPerRally: approximately `10–14` studs/s;
-- MaxSpeed: approximately `240–280` studs/s.
+For the first clean-room candidate:
+- keep both mostly stationary;
+- choose a consistent separation suitable for the speed;
+- spawn the ball on the line between them;
+- first target and trajectory must be obvious immediately.
 
-Choose coherent values in that range; centralize them.
+No floor markers are needed to communicate target.
 
-Do not simply make the first ball lethal-fast. The intended curve is:
-- first incoming ball: obvious/readable;
-- first successful redirect: clearly stronger/faster than the incoming ball;
-- rallies 2–5: rapidly become exciting;
-- later rally: high pressure.
+### 7. Training NPC = deterministic wall
+NPC must return every valid incoming ball. Keep `MissChance = 0`.
 
-If a linear function cannot produce this feel cleanly, a tiny two-stage or multiplicative function is acceptable, but keep it understandable. Do not recreate a large tuning system.
+If it fails at any supported speed, fix its continuous crossing/decision logic while still routing through the same authoritative `TryParry` as Player.
 
-### 7. Redirect must communicate FORCE
-On Player parry, the ball should not feel like it gently changes destination.
+### 8. Combat speed: fast but readable
+Do NOT add another complicated curve.
 
-Preserve immediate authoritative redirect, but make the outgoing event feel decisive:
-- outgoing direction should establish immediately toward the other combatant;
-- speed escalation applies immediately;
-- visual trail can react instantly;
-- optional tiny local camera/FOV impulse is acceptable;
-- optional very short hit-stop-like presentation on the client is acceptable ONLY if it does not delay authority/input.
+Keep the current concept approximately `70 + 12*rally`, capped near `260`, unless code inspection reveals a concrete problem.
 
-No giant VFX. No screen obstruction. We want kinetic force, not spectacle.
+The clean-room test is intended to isolate whether trajectory + timing + immediate redirect are enjoyable once visual contamination is gone.
 
-### 8. Keep Player parry simple
-Do NOT make the Player parry harder in this sprint.
+### 9. Parry input remains simple
+Do not regress the one improvement already observed: Player can now parry.
 
-Keep the simple V2 semantics and approximately generous defensive radius unless testing/code inspection exposes a concrete bug. We already proved this version can connect; preserve that gain.
+Keep immediate server evaluation:
+`input -> target/alive -> approaching -> defensive radius -> cooldown -> redirect`.
 
-No frontal arc. No sword-tip collision. No active/recovery state machine. No TTI gate for the Player.
+No active window state machine, no TTI gate, no frontal arc, no sword mesh authority.
 
-### 9. Camera/readability
-Do not build a camera system. Only fix obvious readability issues.
+### 10. Add build-audit assertions
+The verification must fail if the built `Fatal.rbxlx` contains known rejected legacy presentation.
 
-At duel start, the default view must make opponent/ball direction obvious. On successful parry, a very small short-lived feedback impulse is allowed. No constant shake and no aggressive FOV animation.
+Audit at least:
+- no `FIGHT` text outside tests/docs;
+- no `CRITICAL` text outside tests/docs;
+- no runtime TTI label/controller;
+- no legacy target/debug GUI scripts;
+- exactly one gameplay ball source;
+- actual built ball dimensions match the intended diameter;
+- only expected V2 client/server scripts are present in the Combat Lab runtime tree.
 
-### 10. Preserve engineering invariants
-- exactly one Player combatant;
-- exactly one TrainingOpponent;
-- exactly one authoritative ball;
-- server authoritative success;
-- Player/NPC same `TryParry`;
-- swept hurt collision;
-- deterministic reset;
-- no accumulated connections;
-- `CombatDebug = false` by default.
+The purpose is to prevent us from ever again playtesting a contaminated/stale build while believing it is the new candidate.
 
-## Required verification
-Update focused tests only for changed invariants:
-- NPC intentional miss chance is zero in Combat Lab;
-- NPC can reliably trigger the shared parry path across representative ball speeds;
-- ball asset/part visible size matches intended dimensions after build;
-- duel spawn orientations face each other;
-- normal UI does not instantiate/show rejected overlays;
-- speed curve values are bounded by max;
-- existing one-ball/reset/parry tests continue passing.
+## HUMAN ACCEPTANCE — CLEAN ROOM
+The next candidate is ready to show the human only when:
+1. Screen contains CoreGui + small rally counter and nothing else persistent.
+2. Ball is visibly compact (~1.0–1.2 stud diameter).
+3. Player starts facing NPC; NPC faces Player.
+4. Ball path is immediately obvious.
+5. Player can parry using the simple V2 rule.
+6. NPC returns every valid shot.
+7. Successful parry visibly causes the ball to leave immediately and faster.
+8. No old overlays/markers/debug geometry appear at any point.
+9. Reset returns to the same clean state.
+10. No red runtime errors.
 
-Static verification is NOT approval of feel.
+This does NOT approve gameplay feel. It only creates a trustworthy minimal candidate from which gameplay can finally be judged.
 
-## Human acceptance test
-The next candidate is ready for human evaluation when:
-1. Spawn/reset immediately points the Player into the duel.
-2. The ball visually reads SMALL, not like a large black sphere beside the avatar.
-3. NPC reliably returns every valid ball during training; rallies normally end because the Player misses.
-4. Screen is clean enough that the ball is the primary information source.
-5. First ball is readable but noticeably more energetic than the previous candidate.
-6. Player parry immediately produces a stronger/faster return.
-7. By rallies ~3–5 the exchange clearly feels faster and more exciting.
-8. Player can still successfully parry with the simple V2 rule.
-9. Miss/hit/reset remain coherent and fast.
-10. No red runtime errors during the normal loop.
+## FROZEN
+No inventory, lootboxes, lobby expansion, powers, abilities, dash, cosmetics, economy, DataStore, ranked, quests, battle pass, finishers, social systems, additional NPCs, map art or cinematic polish.
 
-The human tester decides whether Feel Pass 1 passes.
-
-## Frozen scope
-No inventory, lootboxes, shop, economy, DataStore, powers, abilities, dash, cosmetics, ranked, quests, battle pass, finishers, social systems, additional NPCs, final map art, lobby expansion or cinematic polish.
-
-## Completion report
-Keep it short.
+## COMPLETION REPORT
+Keep it short:
 
 ### Git
 branch + pushed SHA.
 
-### Ball visual root cause
-Why `Radius = 0.85` still looked huge and exact fix.
+### Contamination root cause
+Exact source of FIGHT/CRITICAL/0.12/boxes/red marker and why they survived previous builds.
 
-### NPC reliability
-How 100% training parry is achieved while still using shared `TryParry`.
+### Clean build
+How `Fatal.rbxlx` is now guaranteed to contain only intended V2 runtime systems.
 
-### Orientation / UI
-What changed to make the duel immediately readable and screen clean.
+### Ball
+Actual built visual dimensions + authoritative radius.
 
-### Feel tuning
-Only changed speed/redirect/camera values and rationale.
+### Runtime tree
+Expected normal UI/scripts remaining.
 
 ### Verification
-Tests actually executed and results.
-`RUNTIME TESTED: ...` or `RUNTIME NOT TESTED`.
+Exact commands/results. `RUNTIME TESTED: ...` or `RUNTIME NOT TESTED`.
 
 ### Human action
-Open the correct V2 `Fatal.rbxlx` and test 10–20 rallies.
+Open canonical `Fatal.rbxlx` and play.
 
-STOP. Do not add features and do not self-approve.
+STOP. Do not self-approve gameplay and do not add anything else.
