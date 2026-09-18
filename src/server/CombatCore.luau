@@ -36,7 +36,7 @@ function CombatCore:TryParry(actor)
 	if approach <= Config.Parry.ApproachEpsilon then return self:_result(actor, false, "NOT_APPROACHING", distance, approach) end
 	if distance > Config.Parry.DefensiveRadius then return self:_result(actor, false, "OUT_OF_RANGE", distance, approach) end
 	if not self.Ball:Redirect(actor) then return self:_result(actor, false, "REDIRECT_REJECTED", distance, approach) end
-	self.Event:FireAllClients({ Kind = "Parry", Position = position, Rally = self.Ball:GetRally() })
+	self.Event:FireAllClients({ Kind = "Parry", ActorId = actor.Id, Position = position, Rally = self.Ball:GetRally() })
 	return self:_result(actor, true, "PARRIED", distance, approach)
 end
 

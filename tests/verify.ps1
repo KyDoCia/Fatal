@@ -6,7 +6,7 @@ Set-Location -LiteralPath $root
 if ($LASTEXITCODE -ne 0) { throw "asset generation failed" }
 & lune run tests/compile_all.luau
 if ($LASTEXITCODE -ne 0) { throw "Luau compilation failed" }
-& rojo build default.project.json -o FatalV2.rbxlx
+& rojo build default.project.json -o Fatal.rbxlx
 if ($LASTEXITCODE -ne 0) { throw "Rojo build failed" }
 & rojo sourcemap default.project.json -o sourcemap.json
 if ($LASTEXITCODE -ne 0) { throw "sourcemap failed" }

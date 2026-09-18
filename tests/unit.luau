@@ -13,8 +13,9 @@ local function load(path, environment)
 end
 
 local config = load("src/shared/Config/CombatConfig.luau", {})
-check(config.Ball.Radius == 0.85 and config.Parry.DefensiveRadius == 12, "V2 compact ball and defensive radius are explicit")
-check(config.SpeedForRally(0) == 50 and config.SpeedForRally(3) == 71 and config.SpeedForRally(100) == 200, "V2 rally speed is linear and capped")
+check(config.Ball.Radius == 0.7 and config.Parry.DefensiveRadius == 12, "V2 compact ball and defensive radius are explicit")
+check(config.SpeedForRally(0) == 70 and config.SpeedForRally(3) == 106 and config.SpeedForRally(100) == 260, "V2 rally speed is linear and capped")
+check(config.NPC.MissChance == 0 and config.NPC.ReactionDelay == 0, "Combat Lab NPC has deterministic zero-miss reaction")
 
 local trajectory = load("src/shared/Util/TrajectoryMath.luau", {})
 check(trajectory.IsApproaching(roblox.Vector3.new(10, 0, 0), roblox.Vector3.new(-50, 0, 0), roblox.Vector3.zero, 0.1), "incoming direction is accepted")
@@ -81,7 +82,47 @@ local shared = fresh(npc, 8, -1)
 local npcAccepted = shared:TryParry(npc)
 check(npcAccepted, "Player and NPC share the same TryParry path")
 
-local place = roblox.deserializePlace(fs.readFile("FatalV2.rbxlx"))
+local npcConfigToken, npcCharacterToken, npcMathToken = {}, {}, {}
+local npcReplicated = { Game = { Shared = { Config = { CombatConfig = npcConfigToken }, Util = { CharacterUtil = npcCharacterToken, TrajectoryMath = npcMathToken } } } }
+local npcActor = { Id = "N:reliable", Kind = "NPC", Alive = true, CenterPart = { Position = roblox.Vector3.zero } }
+local npcRevision = 20
+local npcPosition = roblox.Vector3.new(11.9, 0, 0)
+local npcVelocity = roblox.Vector3.new(-70, 0, 0)
+local npcRedirects = 0
+local npcRegistry = { IsAlive = function(_, subject) return subject == npcActor and subject.Alive end }
+local npcBall = {
+	IsTracking = function() return true end,
+	GetTarget = function() return npcActor end,
+	GetRevision = function() return npcRevision end,
+	GetRally = function() return npcRedirects end,
+	GetKinematics = function() return npcPosition, npcVelocity end,
+	Redirect = function(_, source) if source ~= npcActor then return false end; npcRedirects += 1; return true end,
+}
+local npcCombat = CombatCore.new(npcRegistry, events)
+npcCombat:SetBall(npcBall)
+npcCombat:SetActive(true)
+local TrainingOpponent = load("src/server/TrainingOpponent.luau", {
+	game = { GetService = function(_, name)
+		if name == "Players" then return {} elseif name == "ReplicatedStorage" then return npcReplicated end
+		error(name)
+	end },
+	require = function(module)
+		if module == npcConfigToken then return config elseif module == npcCharacterToken then return {} elseif module == npcMathToken then return trajectory end
+		error("dependency")
+	end,
+})
+local trainer = TrainingOpponent.new(npcRegistry, npcCombat, npcBall, {})
+trainer.Combatant = npcActor
+for index, speed in { 70, 130, 260 } do
+	now += 0.2
+	npcRevision += 1
+	npcPosition = roblox.Vector3.new(11.9, 0, 0)
+	npcVelocity = roblox.Vector3.new(-speed, 0, 0)
+	trainer:Update()
+	check(npcRedirects == index, "TrainingOpponent uses shared TryParry reliably at " .. speed .. " studs/s")
+end
+
+local place = roblox.deserializePlace(fs.readFile("Fatal.rbxlx"))
 local actualGame = place:GetService("ReplicatedStorage").Game
 local ballConfigToken, ballMathToken = {}, {}
 local ballReplicated = { Game = { Shared = { Config = { CombatConfig = ballConfigToken }, Util = { TrajectoryMath = ballMathToken } }, Assets = { CombatBall = actualGame.Assets.CombatBall } } }
@@ -102,6 +143,10 @@ local remote = { FireAllClients = function() end }
 local ballCore = BallCore.new(ballRegistry, remote, remote, gameplay)
 ballCore:Start(first)
 check(#ballCore:_ownedBalls() == 1, "exactly one authoritative V2 ball spawns")
+check((ballCore.Part.Size - roblox.Vector3.one * config.Ball.Radius * 2).Magnitude < 1e-4, "spawned ball visual matches authoritative diameter")
+local stepObservations = 0
+ballCore:Update(0.05, function() stepObservations += 1 end)
+check(stepObservations >= 2, "ball exposes every bounded movement step to the deterministic NPC decision")
 check(ballCore:Redirect(first) and ballCore:GetTarget() == second and ballCore:GetRally() == 1, "redirect changes target and increments rally immediately")
 ballCore:Stop()
 check(#ballCore:_ownedBalls() == 0, "V2 ball cleanup leaves no authoritative instance")

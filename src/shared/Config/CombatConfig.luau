@@ -1,11 +1,11 @@
 local Config = {
 	CombatDebug = false,
 	Ball = {
-		Radius = 0.85,
+		Radius = 0.7,
 		SpawnHeight = 5,
-		BaseSpeed = 50,
-		MaxSpeed = 200,
-		SpeedPerRally = 7,
+		BaseSpeed = 70,
+		MaxSpeed = 260,
+		SpeedPerRally = 12,
 		HomingRate = 2.4,
 		MaxDeltaTime = 0.1,
 		MaxTravelPerStep = 1.5,
@@ -13,7 +13,7 @@ local Config = {
 	},
 	Parry = {
 		DefensiveRadius = 12,
-		Cooldown = 0.32,
+		Cooldown = 0.1,
 		ApproachEpsilon = 0.1,
 	},
 	Hurt = {
@@ -21,11 +21,9 @@ local Config = {
 		BodyHeight = 5.4,
 	},
 	NPC = {
-		ThinkInterval = 0.025,
-		ReactionRadius = 11.5,
-		ReactionMin = 0.03,
-		ReactionMax = 0.06,
-		MissChance = 0.04,
+		ReactionRadius = 12,
+		ReactionDelay = 0,
+		MissChance = 0,
 	},
 	Round = {
 		Countdown = 0.5,

@@ -8,7 +8,7 @@ local TrainingOpponent = {}
 TrainingOpponent.__index = TrainingOpponent
 
 function TrainingOpponent.new(registry, combat, ball, container)
-	return setmetatable({ Registry = registry, Combat = combat, Ball = ball, Container = container, Random = Random.new(), Combatant = nil, Model = nil, Revision = -1, AttemptAt = nil }, TrainingOpponent)
+	return setmetatable({ Registry = registry, Combat = combat, Ball = ball, Container = container, Combatant = nil, Model = nil, AttemptedRevision = -1 }, TrainingOpponent)
 end
 
 function TrainingOpponent:Spawn(cframe)
@@ -27,26 +27,21 @@ function TrainingOpponent:Spawn(cframe)
 	self.Model = model
 	self.Combatant = self.Registry:RegisterNPC(model)
 	self.Registry:SetAlive(self.Combatant, true)
-	self.Revision = -1
-	self.AttemptAt = nil
+	self.AttemptedRevision = -1
 	return self.Combatant
 end
 
-function TrainingOpponent:Update(now)
+function TrainingOpponent:Update()
 	local actor = self.Combatant
-	if not self.Registry:IsAlive(actor) or self.Ball:GetTarget() ~= actor then self.AttemptAt = nil; return end
+	if not self.Registry:IsAlive(actor) or self.Ball:GetTarget() ~= actor then return end
 	local revision = self.Ball:GetRevision()
-	if revision ~= self.Revision then self.Revision = revision; self.AttemptAt = nil end
+	if revision == self.AttemptedRevision then return end
 	local position, velocity = self.Ball:GetKinematics()
 	local center = actor.CenterPart.Position
 	local distance = (center - position).Magnitude
 	if not TrajectoryMath.IsApproaching(position, velocity, center, Config.Parry.ApproachEpsilon) then return end
-	if not self.AttemptAt and distance <= Config.NPC.ReactionRadius then
-		if self.Random:NextNumber() < Config.NPC.MissChance then self.AttemptAt = math.huge
-		else self.AttemptAt = now + self.Random:NextNumber(Config.NPC.ReactionMin, Config.NPC.ReactionMax) end
-	end
-	if self.AttemptAt and now >= self.AttemptAt then
-		self.AttemptAt = math.huge
+	if distance <= Config.NPC.ReactionRadius then
+		self.AttemptedRevision = revision
 		self.Combat:TryParry(actor)
 	end
 end
@@ -56,8 +51,7 @@ function TrainingOpponent:Clear()
 	if self.Model then self.Model:Destroy() end
 	self.Combatant = nil
 	self.Model = nil
-	self.Revision = -1
-	self.AttemptAt = nil
+	self.AttemptedRevision = -1
 end
 
 return TrainingOpponent

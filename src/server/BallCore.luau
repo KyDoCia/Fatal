@@ -97,13 +97,15 @@ function BallCore:_hit(segment)
 	return true
 end
 
-function BallCore:Update(dt)
+function BallCore:Update(dt, beforeStep)
 	if not self:IsTracking() then return end
 	if not self.Registry:IsAlive(self.Target) then self.State = "Resolved"; self.Target = nil; return end
 	local bounded = math.min(dt, Config.Ball.MaxDeltaTime)
 	local steps = math.max(1, math.ceil(self.Velocity.Magnitude * bounded / Config.Ball.MaxTravelPerStep))
 	local stepDt = bounded / steps
 	for _ = 1, steps do
+		if not self:IsTracking() or not self.Target then break end
+		if beforeStep then beforeStep() end
 		if not self:IsTracking() or not self.Target then break end
 		local desired = (self.Target.CenterPart.Position - self.Position).Unit
 		local direction = TrajectoryMath.RotateTowards(self.Velocity.Unit, desired, Config.Ball.HomingRate * stepDt)
