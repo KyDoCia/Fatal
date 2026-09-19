@@ -9,6 +9,7 @@ local expectedScripts = {
 	["ReplicatedStorage.Game.Shared.Balls.BallDefinitions"] = "ModuleScript",
 	["ReplicatedStorage.Game.Shared.Profile.ProfileSchema"] = "ModuleScript",
 	["ReplicatedStorage.Game.Shared.Effects.ParryEffectDefinitions"] = "ModuleScript",
+	["ReplicatedStorage.Game.Shared.Animations.AnimationDefinitions"] = "ModuleScript",
 	["ReplicatedStorage.Game.Shared.Util.CharacterUtil"] = "ModuleScript",
 	["ReplicatedStorage.Game.Shared.Util.TrajectoryMath"] = "ModuleScript",
 	["ServerScriptService.Game.GameServer"] = "Script",
@@ -25,6 +26,8 @@ local expectedScripts = {
 	["StarterPlayer.StarterPlayerScripts.Game.Weapons.WeaponPresentationController"] = "ModuleScript",
 	["StarterPlayer.StarterPlayerScripts.Game.InventoryController"] = "ModuleScript",
 	["StarterPlayer.StarterPlayerScripts.Game.ParryEffectController"] = "ModuleScript",
+	["StarterPlayer.StarterPlayerScripts.Game.Animations.CharacterAnimationController"] = "ModuleScript",
+	["StarterPlayer.StarterPlayerScripts.Game.Animations.WeaponAnimationController"] = "ModuleScript",
 }
 
 local function resolve(path)
@@ -48,7 +51,7 @@ for _, serviceName in { "ReplicatedStorage", "ServerScriptService", "StarterPlay
 		end
 	end
 end
-assert(scriptCount == 22, "expected exactly 22 canonical game-feel scripts")
+assert(scriptCount == 25, "expected exactly 25 canonical animation-foundation scripts")
 
 local replicated = place:GetService("ReplicatedStorage").Game
 for _, name in { "ParryIntent", "BallSnapshot", "CombatEvent", "InventoryRequest", "InventoryState" } do assert(replicated.Remotes[name]:IsA("RemoteEvent"), "missing remote " .. name) end
@@ -70,6 +73,8 @@ local clientSource = resolve("StarterPlayer.StarterPlayerScripts.Game.ClientBoot
 assert(not string.find(clientSource, 'PlayerGui"):WaitForChild("RallyGui', 1, true), "client must not infinitely wait for the StarterGui clone")
 assert(string.find(clientSource, 'StarterGui:FindFirstChild("RallyGui")', 1, true), "client must verify the canonical StarterGui source")
 assert(string.find(clientSource, "snapshotVelocity = event.Direction.Unit * event.Speed", 1, true), "confirmed redirect must replace stale visual velocity immediately")
+local combatSource = resolve("ServerScriptService.Game.CombatCore").Source
+assert(not string.find(string.upper(combatSource), "ANIMATION", 1, true), "authoritative combat must not depend on animation")
 
 local forbiddenTokens = {
 	"FIGHT", "CRITICAL", "TIMETOIMPACT", "TARGETINDICATOR", "COMBATGUI", "ROUNDGUI",
@@ -110,4 +115,4 @@ local savedBalls = 0
 for _, value in place:GetService("Workspace"):GetDescendants() do if value:GetAttribute("FatalV2Ball") then savedBalls += 1 end end
 assert(savedBalls == 0, "saved place contains an authoritative gameplay ball")
 
-print("PASS: game-feel place has 22 scripts, pooled parry effects, smooth ball presentation, and no legacy UI")
+print("PASS: animation foundation has 25 scripts, safe fallbacks, pooled effects, and no legacy UI")

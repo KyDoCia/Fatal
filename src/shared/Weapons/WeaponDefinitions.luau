@@ -3,7 +3,7 @@ local Definitions = {
 		Id = "TrainingBlade",
 		AssetName = "TrainingBlade",
 		Grip = CFrame.new(0, 1.45, 0),
-		Animations = table.freeze({ Equip = "", Idle = "", ParryAnimations = table.freeze({ "", "", "" }) }),
+		AnimationSet = "TrainingBladeDefault",
 		ParryEffect = "DefaultParryEffect",
 		Sounds = table.freeze({ Parry = "", Hit = "" }),
 	}),

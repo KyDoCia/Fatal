@@ -51,6 +51,7 @@
           "ClientBootstrap": { "$path": "src/client/ClientBootstrap.client.luau" },
           "InventoryController": { "$path": "src/client/InventoryController.luau" },
           "ParryEffectController": { "$path": "src/client/ParryEffectController.luau" },
+          "Animations": { "$path": "src/client/Animations" },
           "Input": { "$path": "src/client/Input" },
           "Weapons": { "$path": "src/client/Weapons" }
         }

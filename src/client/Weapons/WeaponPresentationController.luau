@@ -28,15 +28,6 @@ function WeaponPresentationController:Equip(character)
 	weld.Name = "WeaponGrip"; weld.Part0 = hand; weld.Part1 = model; weld.C0 = self.Definition.Grip; weld.Parent = hand
 	self.Model = model
 	self.Joint = weld
-	local animationId = self.Definition.Animations.ParryAnimations[1]
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
-	if animator and animationId ~= "" then
-		local animation = Instance.new("Animation")
-		animation.AnimationId = animationId
-		self.Track = animator:LoadAnimation(animation)
-		animation:Destroy()
-	end
 end
 
 function WeaponPresentationController:PresentIntent(direction)
@@ -48,7 +39,11 @@ function WeaponPresentationController:PresentIntent(direction)
 end
 
 function WeaponPresentationController:PresentParry()
-	if self.Track then self.Track:Play(0.03, 1, 1) end
+	if self.Joint then self.Joint.Transform *= CFrame.new(0, 0, -0.12) end
+end
+
+function WeaponPresentationController:PresentMiss()
+	-- The immediate swing already communicates the miss; no confirmed impact is added.
 end
 
 function WeaponPresentationController:Destroy()

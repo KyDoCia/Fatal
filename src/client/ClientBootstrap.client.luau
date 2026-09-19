@@ -10,10 +10,13 @@ local CombatTypes = require(replicatedGame.Shared.Combat.CombatTypes)
 local WeaponDefinitions = require(replicatedGame.Shared.Weapons.WeaponDefinitions)
 local BallDefinition = require(replicatedGame.Shared.Balls.BallDefinitions).StandardBall
 local Effects = require(replicatedGame.Shared.Effects.ParryEffectDefinitions)
+local AnimationDefinitions = require(replicatedGame.Shared.Animations.AnimationDefinitions)
 local CombatInputController = require(script.Parent.Input.CombatInputController)
 local WeaponPresentationController = require(script.Parent.Weapons.WeaponPresentationController)
 local InventoryController = require(script.Parent.InventoryController)
 local ParryEffectController = require(script.Parent.ParryEffectController)
+local CharacterAnimationController = require(script.Parent.Animations.CharacterAnimationController)
+local WeaponAnimationController = require(script.Parent.Animations.WeaponAnimationController)
 local remotes = replicatedGame:WaitForChild("Remotes")
 local parryIntent = remotes:WaitForChild("ParryIntent")
 local snapshot = remotes:WaitForChild("BallSnapshot")
@@ -44,7 +47,9 @@ local orientedRevision = -1
 local pulseRevision = 0
 
 local weapon = WeaponPresentationController.new(player, WeaponDefinitions.TrainingBlade)
-local input = CombatInputController.new(parryIntent, function(direction) weapon:PresentIntent(direction) end)
+local characterAnimations = CharacterAnimationController.new(player, AnimationDefinitions.CharacterSets.Default)
+local weaponAnimations = WeaponAnimationController.new(weapon, AnimationDefinitions.WeaponSets.TrainingBladeDefault)
+local input = CombatInputController.new(parryIntent, function(direction) weaponAnimations:PlayAttempt(direction) end)
 input:Bind()
 InventoryController.Start(player, inventoryRequest, inventoryState)
 
@@ -142,7 +147,7 @@ combatEvent.OnClientEvent:Connect(function(event)
 		if trail then trail.Lifetime = Config.Feedback.ParryTrailLifetime; trail.LightEmission = 1 end
 		playSoundHook(ball, "ParrySound", intensity)
 		ParryEffectController.Present(event.Position, direction, intensity)
-		weapon:PresentParry()
+		if event.ActorId == "P:" .. player.UserId then weaponAnimations:Confirm(direction) end
 		local camera = workspace.CurrentCamera
 		if camera then camera.CFrame *= CFrame.new(0, 0, Config.Feedback.CameraImpulse * (0.65 + intensity * 0.35)) end
 		task.delay(Config.Feedback.ParryFlashDuration, function()
