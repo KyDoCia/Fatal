@@ -8,7 +8,8 @@ local replicatedGame = ReplicatedStorage:WaitForChild("Game")
 local Config = require(replicatedGame:WaitForChild("Shared"):WaitForChild("Config"):WaitForChild("CombatConfig"))
 local CombatTypes = require(replicatedGame.Shared.Combat.CombatTypes)
 local WeaponDefinitions = require(replicatedGame.Shared.Weapons.WeaponDefinitions)
-local BallDefinition = require(replicatedGame.Shared.Balls.BallDefinitions).StandardBall
+local BallDefinitions = require(replicatedGame.Shared.Balls.BallDefinitions)
+local BallDefinition = BallDefinitions.StandardBall
 local Effects = require(replicatedGame.Shared.Effects.ParryEffectDefinitions)
 local AnimationDefinitions = require(replicatedGame.Shared.Animations.AnimationDefinitions)
 local CombatInputController = require(script.Parent.Input.CombatInputController)
@@ -45,6 +46,8 @@ local snapshotVelocity = Vector3.zero
 local snapshotAt = 0
 local orientedRevision = -1
 local pulseRevision = 0
+local pulseTask = nil
+local baseVisualSize = nil
 
 local weapon = WeaponPresentationController.new(player, WeaponDefinitions.TrainingBlade)
 local characterAnimations = CharacterAnimationController.new(player, AnimationDefinitions.CharacterSets.Default)
@@ -71,14 +74,20 @@ snapshot.OnClientEvent:Connect(function(state)
 	if type(state) ~= "table" or type(state.Rally) ~= "number" then return end
 	local incoming = if typeof(state.Ball) == "Instance" and state.Ball:IsA("BasePart") then state.Ball else nil
 	if incoming ~= authoritativeBall then
+		if pulseTask then task.cancel(pulseTask); pulseTask = nil end
+		pulseRevision = 0
 		if currentBall then currentBall:Destroy() end
 		authoritativeBall = incoming
 		currentBall = nil
+		baseVisualSize = nil
 		if incoming then
 			incoming.LocalTransparencyModifier = 1
 			currentBall = incoming:Clone()
 			currentBall.Name = "BallPresentation"
 			currentBall:SetAttribute("FatalV2Ball", nil)
+			local source = replicatedGame.Assets:FindFirstChild(BallDefinition.AssetName)
+			baseVisualSize = BallDefinitions.CanonicalVisualSize(BallDefinition, source and source.Size or incoming.Size)
+			currentBall.Size = baseVisualSize
 			currentBall.Parent = workspace
 		end
 	end
@@ -135,10 +144,10 @@ combatEvent.OnClientEvent:Connect(function(event)
 		end
 		pulseRevision += 1
 		local pulse = pulseRevision
+		if pulseTask then task.cancel(pulseTask) end
 		local intensity = Effects.ImpactIntensity(event.Speed or snapshotVelocity.Magnitude, event.Rally, Config.Ball.MaxSpeed)
-		local baseSize = currentBall.Size
 		ball.Color = Color3.fromRGB(255, 245, 215)
-		ball.Size = Vector3.new(baseSize.X * 0.82, baseSize.Y * 0.82, baseSize.Z * (1.25 + intensity * 0.2))
+		ball.Size = BallDefinitions.ImpactVisualSize(BallDefinition, baseVisualSize, intensity)
 		local direction = typeof(event.Direction) == "Vector3" and event.Direction or snapshotVelocity.Unit
 		ball.CFrame = CFrame.lookAt(ball.Position, ball.Position + direction)
 		local light = ball:FindFirstChild("CoreLight")
@@ -150,11 +159,12 @@ combatEvent.OnClientEvent:Connect(function(event)
 		if event.ActorId == "P:" .. player.UserId then weaponAnimations:Confirm(direction) end
 		local camera = workspace.CurrentCamera
 		if camera then camera.CFrame *= CFrame.new(0, 0, Config.Feedback.CameraImpulse * (0.65 + intensity * 0.35)) end
-		task.delay(Config.Feedback.ParryFlashDuration, function()
+		pulseTask = task.delay(Config.Feedback.ParryFlashDuration, function()
+			pulseTask = nil
 			if pulse ~= pulseRevision or not ball.Parent then return end
 			pulseRevision = 0
 			ball.Color = baseColor
-			ball.Size = baseSize
+			ball.Size = baseVisualSize
 			if light and light.Parent then light.Brightness = 0.8 end
 			if trail and trail.Parent then trail.Lifetime = 0.1; trail.LightEmission = 0.8 end
 		end)

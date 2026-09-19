@@ -77,7 +77,17 @@ assert(ball:FindFirstChildOfClass("Trail"), "built ball must preserve the readab
 assert(ball:FindFirstChild("CoreLight") and ball.CoreLight:IsA("PointLight"), "built ball must expose the parry flash light")
 assert(ball:FindFirstChild("ParrySound") and ball.ParrySound:IsA("Sound") and ball:FindFirstChild("HitSound") and ball.HitSound:IsA("Sound"), "built ball must expose empty sound hooks")
 local weapon = replicated.Assets.TrainingBlade
-assert(weapon:IsA("BasePart") and not weapon.CanCollide and not weapon.CanTouch and not weapon.CanQuery, "placeholder weapon must be presentation-only")
+assert(weapon:IsA("Model") and weapon.PrimaryPart and weapon.PrimaryPart.Name == "Handle", "TrainingBlade must expose a predictable Handle primary part")
+local grip = weapon.PrimaryPart:FindFirstChild("WeaponGripAttachment")
+assert(grip and grip:IsA("Attachment"), "TrainingBlade must expose its semantic grip point")
+local weaponParts, weaponWelds = 0, 0
+for _, value in weapon:GetDescendants() do
+	if value:IsA("BasePart") then
+		weaponParts += 1
+		assert(not value.Anchored and not value.CanCollide and not value.CanTouch and not value.CanQuery and value.Massless, "TrainingBlade parts must be presentation-only")
+	elseif value:IsA("WeldConstraint") then weaponWelds += 1 end
+end
+assert(weaponParts == 3 and weaponWelds == 2, "TrainingBlade must contain one welded handle, guard, and blade assembly")
 
 local starterGui = place:GetService("StarterGui")
 local guiChildren = starterGui:GetChildren()
@@ -88,8 +98,13 @@ local clientSource = resolve("StarterPlayer.StarterPlayerScripts.Game.ClientBoot
 assert(not string.find(clientSource, 'PlayerGui"):WaitForChild("RallyGui', 1, true), "client must not infinitely wait for the StarterGui clone")
 assert(string.find(clientSource, 'StarterGui:FindFirstChild("RallyGui")', 1, true), "client must verify the canonical StarterGui source")
 assert(string.find(clientSource, "snapshotVelocity = event.Direction.Unit * event.Speed", 1, true), "confirmed redirect must replace stale visual velocity immediately")
+assert(string.find(clientSource, "BallDefinitions.ImpactVisualSize(BallDefinition, baseVisualSize", 1, true), "ball impact must derive from canonical visual scale")
+assert(not string.find(clientSource, "local baseSize = currentBall.Size", 1, true), "ball impact cannot capture an intermediate displayed size")
 local combatSource = resolve("ServerScriptService.Game.CombatCore").Source
 assert(not string.find(string.upper(combatSource), "ANIMATION", 1, true), "authoritative combat must not depend on animation")
+local weaponSource = resolve("StarterPlayer.StarterPlayerScripts.Game.Weapons.WeaponPresentationController").Source
+assert(string.find(weaponSource, "weld.C0 = handAttachment.CFrame; weld.C1 = weaponAttachment.CFrame", 1, true), "weapon joint must align semantic hand and weapon grip points")
+assert(not string.find(weaponSource, "Joint.Transform", 1, true), "parry presentation must not mutate the weapon grip")
 
 local forbiddenTokens = {
 	"FIGHT", "CRITICAL", "TIMETOIMPACT", "TARGETINDICATOR", "COMBATGUI", "ROUNDGUI",

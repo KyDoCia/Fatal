@@ -21,6 +21,16 @@ local animationDefinitions = load("src/shared/Animations/AnimationDefinitions.lu
 check(animationDefinitions.CharacterSets.Default.Jump == "" and animationDefinitions.CharacterSets.Default.Fall == "", "missing custom locomotion IDs preserve Roblox defaults")
 check(animationDefinitions.WeaponSets.TrainingBladeDefault.Equip ~= nil and animationDefinitions.WeaponSets.TrainingBladeDefault.ParryAttempt ~= nil, "weapon animation contract separates equip and immediate attempt slots")
 check(animationDefinitions.WeaponSets.TrainingBladeDefault.ParryHit.Left ~= nil and animationDefinitions.WeaponSets.TrainingBladeDefault.ParryMiss.Default ~= nil, "weapon animation contract separates directional hit and miss slots")
+local visualBase = ballDefinitions.CanonicalVisualSize(ballDefinitions.StandardBall, roblox.Vector3.new(2, 2, 2))
+for _, parryCount in { 1, 10, 50, 130 } do
+	local displayed = visualBase
+	for index = 1, parryCount do displayed = ballDefinitions.ImpactVisualSize(ballDefinitions.StandardBall, visualBase, index / parryCount) end
+	displayed = visualBase
+	check(displayed == visualBase, "ball visual returns exactly to canonical scale after " .. parryCount .. " parries")
+end
+local overlapping = visualBase
+for index = 1, 130 do overlapping = ballDefinitions.ImpactVisualSize(ballDefinitions.StandardBall, visualBase, index % 10 / 10) end
+check(math.abs(overlapping.X - visualBase.X * ballDefinitions.StandardBall.ImpactScale.Squash) < 1e-6, "overlapping parries always derive squash from canonical scale")
 check(effectDefinitions.ImpactIntensity(0, 0, config.Ball.MaxSpeed) == 0 and effectDefinitions.ImpactIntensity(config.Ball.MaxSpeed * 2, 100, config.Ball.MaxSpeed) == 1, "shared impact intensity remains normalized")
 check(effectDefinitions.Resolve("invalid") == effectDefinitions.DefaultParryEffect, "invalid equipped effect falls back to DefaultParryEffect")
 check(ballDefinitions.StandardBall.AssetName == "CombatBall" and ballDefinitions.StandardBall.HitRadius == nil and ballDefinitions.StandardBall.GameplaySpeed == nil, "ball presentation definition cannot override authoritative geometry or speed")
@@ -31,6 +41,7 @@ local derivedApproach = (separation - config.Ball.LaunchOffset - config.Parry.De
 check(math.abs(config.FirstApproachSeconds(separation) - derivedApproach) < 1e-6, "first approach timing derives from actual geometry")
 check(config.ParryOpportunityMilliseconds(config.SpeedForRally(0)) > config.ParryOpportunityMilliseconds(config.SpeedForRally(3)), "defensive opportunity shrinks as rally speed rises")
 check(config.NPC.ReactionRadius == config.Parry.DefensiveRadius, "Combat Lab NPC returns every valid defensive crossing")
+check(config.NPC.Enabled and config.NPC.SoloOnly, "solo TrainingOpponent is controlled by explicit default configuration")
 
 local trajectory = load("src/shared/Util/TrajectoryMath.luau", {})
 local targetSelector = load("src/server/TargetSelector.luau", {})
@@ -382,6 +393,11 @@ local DuelService = load("src/server/DuelService.luau", {
 check(not DuelService.IsWinEligible(2), "two humans cannot produce a Win")
 check(not DuelService.IsWinEligible(2), "two humans plus any training NPC still cannot produce a Win")
 check(DuelService.IsWinEligible(3), "three humans freeze an eligible round")
+check(not DuelService.ShouldSpawnTrainingBot(0), "zero humans never spawn a TrainingOpponent")
+check(DuelService.ShouldSpawnTrainingBot(1), "one human spawns exactly one enabled solo TrainingOpponent")
+check(not DuelService.ShouldSpawnTrainingBot(2) and not DuelService.ShouldSpawnTrainingBot(3), "two or more humans never spawn a solo TrainingOpponent")
+check(not DuelService.ShouldSpawnTrainingBot(1, { Enabled = false, SoloOnly = true }), "disabled TrainingOpponent never spawns")
+for _ = 1, 100 do check(DuelService.ShouldSpawnTrainingBot(1), "solo bot policy remains singular across round boundaries") end
 local duelPlayer = { Id = "P:duel", Alive = true }
 local duelNPC = { Id = "N:duel", Alive = true }
 local duelAlive = { duelPlayer, duelNPC }

@@ -31,6 +31,8 @@ local Config = {
 		BodyHeight = 5.4,
 	},
 	NPC = {
+		Enabled = true,
+		SoloOnly = true,
 		ReactionRadius = 10,
 	},
 	Feedback = {

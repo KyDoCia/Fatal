@@ -95,17 +95,27 @@ for _, name in { "ParrySound", "HitSound" } do
 end
 fs.writeFile("assets/CombatBall.rbxm", roblox.serializeModel({ ball }))
 
-local blade = Instance.new("Part")
-blade.Name = "TrainingBlade"
-blade.Size = Vector3.new(0.22, 3.4, 0.42)
-blade.Color = Color3.fromRGB(205, 215, 230)
-blade.Material = Enum.Material.Metal
-blade.Anchored = false
-blade.CanCollide = false
-blade.CanTouch = false
-blade.CanQuery = false
-blade.Massless = true
-fs.writeFile("assets/TrainingBlade.rbxm", roblox.serializeModel({ blade }))
+local bladeModel = Instance.new("Model")
+bladeModel.Name = "TrainingBlade"
+local function weaponPart(name, size, cframe, color, material)
+	local value = Instance.new("Part")
+	value.Name = name; value.Size = size; value.CFrame = cframe; value.Color = color; value.Material = material
+	value.Anchored = false; value.CanCollide = false; value.CanTouch = false; value.CanQuery = false; value.Massless = true
+	value.Parent = bladeModel
+	return value
+end
+local handle = weaponPart("Handle", Vector3.new(0.28, 0.9, 0.28), CFrame.new(0, 0, 0), Color3.fromRGB(52, 38, 34), Enum.Material.SmoothPlastic)
+local guard = weaponPart("Guard", Vector3.new(1.05, 0.16, 0.3), CFrame.new(0, 0.53, 0), Color3.fromRGB(116, 92, 58), Enum.Material.Metal)
+local blade = weaponPart("Blade", Vector3.new(0.22, 3.1, 0.38), CFrame.new(0, 2.14, 0), Color3.fromRGB(205, 215, 230), Enum.Material.Metal)
+local grip = Instance.new("Attachment")
+grip.Name = "WeaponGripAttachment"
+grip.Parent = handle
+for _, connected in { guard, blade } do
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = handle; weld.Part1 = connected; weld.Parent = handle
+end
+bladeModel.PrimaryPart = handle
+fs.writeFile("assets/TrainingBlade.rbxm", roblox.serializeModel({ bladeModel }))
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "RallyGui"

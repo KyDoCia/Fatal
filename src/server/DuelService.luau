@@ -12,6 +12,12 @@ function DuelService.IsWinEligible(humanCount)
 	return humanCount >= Config.Rewards.MinimumHumansForWin
 end
 
+function DuelService.ShouldSpawnTrainingBot(humanCount, settings)
+	settings = settings or Config.NPC
+	if not settings.Enabled or humanCount == 0 then return false end
+	return if settings.SoloOnly then humanCount == 1 else true
+end
+
 function DuelService.new(registry, combat, ball, opponent, gameplay, combatEvent, profiles)
 	local spawns = gameplay:WaitForChild("SpawnPoints"):GetChildren()
 	table.sort(spawns, function(a, b) return a.Name < b.Name end)
@@ -57,7 +63,7 @@ function DuelService:_prepare()
 		if actor then table.insert(humans, actor) end
 	end
 	if #humans == 0 then return false end
-	if #humans == 1 then
+	if DuelService.ShouldSpawnTrainingBot(#humans) then
 		local spawn = self.Spawns[2]
 		self.Opponent:Spawn(CFrame.lookAt(spawn.Position + Vector3.new(0, 3, 0), humans[1].CenterPart.Position))
 	end
@@ -86,6 +92,16 @@ end
 function DuelService:HandleDeparture(combatant)
 	if self.State == State.Active and combatant and combatant.Alive then
 		self.Event:FireAllClients(CombatTypes.Event(CombatTypes.EventKind.CombatantEliminated, { CombatantId = combatant.Id, Reason = "LEFT" }))
+	end
+	local remainingHumans = #Players:GetPlayers()
+	if combatant and combatant.Player then
+		for _, player in Players:GetPlayers() do if player == combatant.Player then remainingHumans -= 1; break end end
+	end
+	if remainingHumans == 0 and self.State ~= State.Waiting and self.State ~= State.Resetting then
+		self.Combat:SetActive(false)
+		self.Ball:Stop()
+		self.Opponent:Clear()
+		self:_transition(State.Resetting)
 	end
 end
 
