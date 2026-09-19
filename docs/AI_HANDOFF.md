@@ -3,206 +3,224 @@
 > Git is the source of truth. Human Studio playtest is the authority for gameplay quality.
 
 ## STATUS
-**COMBAT CORE V2 — GAMEPLAY REJECTED / HIT-CONFIRM LOOP REQUIRED**
+**RUNTIME BREAKTHROUGH CONFIRMED — FOUNDATION SPRINT AUTHORIZED**
 
-The clean/minimal runtime exposed the real gameplay problem instead of solving it.
+The latest clean runtime test produced the first clear positive signal: the test loop ran successfully in Studio and sustained a very high rally (`RALLY 130` observed). This proves the fundamental exchange loop can now remain alive long enough to evaluate and develop.
 
-Latest human evidence:
-- ball is now too small;
-- ball is extremely fast;
-- human perceives effectively zero realistic chance to parry;
-- there is no satisfying/legible hit-confirm system;
-- overall gameplay remains rejected.
+This is NOT gameplay approval. The visible runtime is still prototype-grade and the project urgently needs structure, readability, impact, and maintainable foundations.
 
-Do not add product features. Do not merge to main. Do not add complexity to hide the failure.
+User constraint: Codex budget is limited (~40% remaining). Optimize for leverage and avoid broad feature work or speculative rewrites.
 
-## WHAT WE LEARNED
-Previous iterations oscillated between extremes:
-- oversized/slow/noisy;
-- then tiny/fast/empty.
+## DECISION
+Stop restarting combat from scratch.
 
-This means we have been tuning isolated parameters rather than designing a coherent perception-action loop.
+We now have evidence that the core exchange can run. Preserve the working runtime behavior and convert the prototype into a strong combat foundation with the minimum code necessary.
 
-The next task is NOT `make ball bigger` or `make speed slower` independently. Design the complete loop:
+Do not spend this sprint on inventory, lootboxes, progression, powers, cosmetics, final map art or product systems.
 
-`SEE incoming threat -> ANTICIPATE contact -> PRESS parry -> RECEIVE immediate hit-confirm -> UNDERSTAND redirect -> PREPARE next return`.
+## NEXT TASK — FOUNDATION SPRINT: COMBAT VERTICAL SLICE
 
-Every number and visual in the next candidate must serve this loop.
+Continue on `codex/combat-core-v2`. Fetch `origin/main`, read this handoff, and incorporate the handoff update without merging implementation into main.
 
-## NEXT TASK — COMBAT FEEL V3: READ -> PARRY -> HIT-CONFIRM
+The sprint has four priorities, in this order:
 
-Continue on `codex/combat-core-v2` unless the branch has become unsafe. Preserve the simple server-authoritative TryParry architecture and clean runtime. Do not resurrect old overlays/state machines.
+1. **Combat correctness and state model**
+2. **Player readability and hit/parry feedback**
+3. **R15 weapon/animation integration seam**
+4. **Architecture for future systems without implementing them**
 
-### 1. Establish readable duel timing from distance, not arbitrary speed
-Audit actual Player/NPC spawn separation and calculate travel time.
+### 1. Freeze the working exchange as a regression baseline
+Before refactoring, capture the currently working behavior in focused tests/invariants:
+- exactly one authoritative ball;
+- exactly one Player + one TrainingOpponent in Combat Lab;
+- shared server-authoritative parry path;
+- NPC can sustain long rallies deterministically in training mode;
+- rally count increments exactly once per confirmed parry;
+- one confirmed parry cannot double-redirect;
+- one body hit cannot double-eliminate;
+- reset cannot duplicate connections/ball/NPC;
+- current clean build remains free of rejected legacy UI.
 
-For the FIRST incoming ball, target approximately `0.9–1.15 seconds` of readable travel from launch to the Player's defensive zone.
+Do not encode subjective feel values as permanent tests. Test invariants, not arbitrary tuning.
 
-Do not pick BaseSpeed in isolation. Compute it from actual launch distance so the human receives roughly this reaction budget.
+### 2. Establish explicit combat states
+The runtime should expose a small authoritative duel state model, not scattered booleans.
 
-After successful parries, accelerate progressively, but do not jump immediately from readable to impossible.
+Use a compact enum/state concept approximately:
+`Waiting -> Countdown -> Active -> Eliminated/Ending -> Resetting`
 
-Target feel envelope for early rally:
-- initial approach: learnable;
-- rally 1: clearly faster but comfortable;
-- rally 2–3: engaging;
-- rally 4–6: demanding;
-- later: high pressure.
+Do NOT rebuild the old parry Active/Recovery state machine. This state model is for the DUEL lifecycle only.
 
-Keep the speed function small and understandable. Tune from desired travel time at the actual arena separation.
+Transitions must be centralized and observable. Ball simulation/parry/hit must reject actions outside `Active`.
 
-### 2. Ball visual size = readable, not giant and not tiny
-The previous candidate was too large; the latest clean candidate is too small.
+### 3. Formalize combat events
+Create/clean a minimal event contract between server and client. Prefer a single clear combat event channel or a very small set of remotes.
 
-Choose a middle visual diameter approximately `1.8–2.2 studs` as the next hypothesis.
+Required semantic events:
+- `DuelStateChanged`
+- `BallTargetChanged`
+- `ParryConfirmed`
+- `CombatantHit`
+- `RallyChanged`
 
-Do NOT make authoritative hurt collision equally huge. Visual readability, hurt collision and defensive parry radius are separate concepts.
+Payloads should be minimal and versionable. Do not stream redundant per-frame gameplay state through remotes.
 
-Use a high-contrast ball core with a restrained trail so motion direction is legible. Avoid a featureless black sphere that disappears against dark backgrounds.
+Server remains authoritative. Client events are presentation signals, never proof of success.
 
-### 3. Introduce a real HIT-CONFIRM system
-A successful parry must be unmistakable within a fraction of a second without covering the screen.
+### 4. Build a real hit/parry feedback layer
+The working loop currently proves mechanics but not quality.
 
-Implement a compact `ParryConfirmed` feedback event from the authoritative success path.
+On `ParryConfirmed`, client presentation should have synchronized micro-feedback:
+- immediate readable ball redirect;
+- short high-contrast ball/core flash;
+- trail pulse/stretch;
+- clean impact/parry sound hook;
+- short weapon animation hook;
+- subtle camera impulse (small, no constant shake).
 
-On confirmed Player parry, combine a few synchronized micro-feedback elements:
-- immediate ball direction change;
-- brief ball brightness/core flash;
-- trail pulse/stretch for roughly 0.08–0.15s;
-- short clean impact/parry sound hook;
-- very small camera impulse or FOV kick, optional and subtle;
-- weapon/parry animation hook if available, but never make animation timing authoritative.
+On `CombatantHit`:
+- brief victim/world hit flash;
+- distinct hit sound hook;
+- ball visibly terminates/locks at impact instead of ambiguously passing through;
+- duel state advances once;
+- quick clean reset.
 
-The feedback must begin on confirmed success and clearly communicate `I hit that`.
+No giant text, no CRITICAL/TTI overlays, no screen-filling effects.
 
-No giant text. No CRITICAL. No hitmarker covering the center. No long animation lock.
+### 5. Improve ball readability without re-breaking timing
+Do not radically change the now-working timing in the same sprint.
 
-### 4. Add a readable PRE-CONTACT cue, not an answer button
-The player currently has effectively zero chance to judge the moment at high speed.
+Keep current proven travel behavior unless there is a correctness defect. Improve visual tracking instead:
+- compact but readable core;
+- high contrast against both sky and dark floor;
+- restrained trail showing direction;
+- target-only subtle intensity increase near defensive range if already architecturally clean.
 
-For the current target only, add one subtle world-space cue that intensifies as the ball enters the parry opportunity region. Prefer the ball itself changing slightly (core brightness/trail intensity) rather than UI text.
+Ball visual size, hurt radius and Player defensive radius remain separate concepts.
 
-The cue should answer `danger is entering my defensive zone`, not `press now automatically`.
+### 6. R15 weapon integration seam
+The game is R15 and future weapons must not require rewriting combat.
 
-No countdown number, TTI label, FIGHT text, giant target marker or floor marker.
+Create a clean `WeaponDefinition`/`WeaponPresentation` boundary (names may differ) where a weapon can provide:
+- model/asset reference;
+- grip/attachment metadata;
+- idle/equip/parry animation IDs or hooks;
+- parry sound/VFX presentation metadata.
 
-### 5. Player parry forgiveness
-Keep immediate server evaluation, but add ONE simple form of temporal forgiveness if necessary for human input/network timing.
+IMPORTANT: weapon mesh/hitbox must NOT determine authoritative parry success. Weapons are presentation/identity over the combat mechanic.
 
-Preferred baseline: a small early input buffer around `0.10–0.14s` ONLY when the Player is the current target and the ball is approaching. If Player presses just before the ball enters defensive range, remember the intent briefly and consume it immediately when the ball crosses the valid defensive radius.
+Implement only ONE placeholder/test weapon through this seam. Do not build inventory or multiple weapons.
 
-This must remain simple:
-- one pending timestamp/expiry;
-- one consume opportunity;
-- clear after success, target change, expiry, death or reset.
+### 7. Input abstraction
+Keep PC inputs working, but route intent through a tiny input/action layer so mobile/console can be added later without touching CombatCore.
 
-Do not rebuild the old multi-phase Active/Recovery/TryConfirm architecture.
+Current baseline may remain MouseButton1 + F. The server receives only semantic `ParryIntent`.
 
-The normal in-range press must still redirect immediately.
+Do not implement mobile/console UI in this sprint.
 
-### 6. Defensive radius should create a time window, not a random distance
-Derive/inspect the effective parry window in milliseconds at representative speeds.
+### 8. Central tuning schema
+Consolidate gameplay tuning into one clear config with grouped concepts:
+- Ball movement;
+- Parry opportunity/forgiveness;
+- Rally progression;
+- NPC training behavior;
+- Feedback intensity/durations;
+- Duel/reset timing.
 
-For early rallies, target roughly `180–280ms` of practical opportunity between entering the defensive region and body impact. Adjust defensive radius/body geometry/speed coherently to achieve a learnable window.
+Remove dead/rejected knobs from previous architectures. Every remaining tuning field must be read by runtime or deliberately documented as reserved.
 
-At higher rallies this naturally shrinks, creating skill progression.
+### 9. Observability without visual pollution
+Add a development-only compact telemetry path that can report per parry/hit:
+- rally;
+- speed;
+- distance at input;
+- immediate vs buffered result if buffer exists;
+- reject reason;
+- hit target;
+- duel state.
 
-Report the approximate window at rally 0, 3 and 6 using actual configured geometry/speeds.
+No per-frame spam. No debug UI in normal runtime. One toggle, OFF by default.
 
-### 7. Hurt semantics
-Missing the parry must produce a clear hit result.
+### 10. Future architecture — interfaces only
+Prepare obvious extension points, but DO NOT implement their systems:
+- `WeaponService` / weapon definitions;
+- `Combatant` abstraction capable of Player/NPC;
+- `Round/DuelService` lifecycle;
+- presentation events suitable for future abilities/cosmetics;
+- target-selection function that can later support >2 combatants.
 
-On authoritative body hit:
-- ball visibly reaches/intersects the coherent hurt volume;
-- short hit flash/sound hook;
-- elimination/state change occurs immediately;
-- ball stops/cleans up rather than visually passing through;
-- quick reset.
+Do not create empty enterprise abstractions or dozens of placeholder modules. Add a seam only when the current vertical slice already touches that responsibility.
 
-This is the `system of hits` currently missing from the experience.
+### 11. Project structure target
+Keep the hot path easy to trace. A reasonable shape is approximately:
 
-Do not rely on Roblox `Touched` alone; keep swept collision.
+`src/shared/Config/CombatConfig`
+`src/shared/Combat/CombatTypes`
+`src/shared/Weapons/WeaponDefinitions`
+`src/server/Combat/CombatCore`
+`src/server/Combat/BallService`
+`src/server/Combat/CombatantService`
+`src/server/Combat/TrainingOpponent`
+`src/server/Duel/DuelService`
+`src/server/Weapons/WeaponService`
+`src/client/Input/CombatInputController`
+`src/client/Combat/CombatPresentationController`
+`src/client/Weapons/WeaponPresentationController`
 
-### 8. TrainingOpponent remains a rally wall
-NPC continues to return every valid shot for this testing phase through the SAME authoritative TryParry path.
+Do NOT churn filenames merely to match this example. Refactor only when it materially improves ownership/dependencies.
 
-Its job is to expose Player timing repeatedly. No intentional misses.
+### 12. Performance and networking
+Keep one authoritative simulation path. No per-ball/per-NPC heartbeat connections if a centralized update already exists.
 
-### 9. Keep screen clean
-Normal runtime remains:
-- CoreGui;
-- small rally counter;
-- ball/world-space micro-cues only.
+Avoid remote spam. Presentation should interpolate locally where appropriate; server sends semantic events/snapshots only as needed.
 
-No old overlays or debug presentation.
+Do not prematurely optimize beyond obvious hot-path issues.
 
-### 10. Instrument perception timing for debug only
-With a development toggle, log/inspect:
-- actual distance at Player input;
-- ball speed;
-- estimated milliseconds until hurt contact;
-- whether immediate or buffered parry succeeded;
-- reason for failure.
+## DEFINITION OF DONE
+This sprint is complete when:
+1. Current long-rally capability is preserved.
+2. Duel lifecycle has explicit centralized states.
+3. Parry/hit/rally/target/state presentation events have clear contracts.
+4. Player gets unmistakable but clean parry and hit feedback.
+5. One R15 placeholder weapon runs through a reusable presentation seam.
+6. Input intent is decoupled from keyboard/mouse specifics.
+7. Tuning is centralized and dead knobs removed.
+8. Debug telemetry is useful and OFF by default.
+9. Clean build verification prevents legacy contamination.
+10. No inventory/lootbox/power/product scope entered.
 
-No per-frame spam and nothing visible in normal play.
+## VERIFICATION
+Run existing compile/build/audit tests plus focused invariants added above.
 
-## REQUIRED TESTS
-Focus only on this loop:
-- first-ball travel time derived from actual separation;
-- effective defensive opportunity at representative speeds;
-- immediate in-range parry;
-- early-buffer consume and expiry;
-- buffer cleared on target/reset/death;
-- confirmed parry feedback event fires exactly once;
-- body hit fires exactly once and stops/cleans ball;
-- NPC shared-path reliability;
-- no rejected legacy UI in built place.
+If Studio runtime cannot be executed, state `RUNTIME NOT TESTED`. Do not infer feel from tests.
 
-Static tests do not approve feel.
-
-## HUMAN ACCEPTANCE
-The next candidate is worth evaluating only if:
-1. Ball is easy to visually track without looking huge.
-2. First incoming ball gives about one second to read its approach.
-3. Human can intentionally parry several early returns, not by luck.
-4. Successful parry gives immediate unmistakable micro hit-confirm.
-5. Slightly early input can be rescued by the small buffer; very early input still fails.
-6. Missing produces a clear body hit/elimination instead of ambiguity.
-7. NPC returns every valid ball.
-8. Rally becomes progressively demanding instead of instantly impossible.
-9. Screen remains clean.
-10. No runtime errors.
-
-The human tester decides pass/fail.
-
-## FROZEN
-No inventory, lootboxes, lobby expansion, powers, abilities, dash, cosmetics, economy, DataStore, ranked, quests, battle pass, finishers, social systems, additional NPCs, final map art or cinematic polish.
+Preserve the canonical `Fatal.rbxlx` build workflow. Human test must be performed with the generated place and without Rojo live-sync unless explicitly testing the Rojo workflow.
 
 ## COMPLETION REPORT
-Keep it short:
+Keep it compact to save budget.
 
 ### Git
 branch + pushed SHA.
 
-### Perception loop
-actual separation, first-ball speed and resulting travel time.
+### Foundation
+state model + event contract + module ownership changes.
 
-### Ball readability
-actual visible diameter/core/trail changes.
+### Combat feedback
+parry/hit presentation implemented.
 
-### Parry opportunity
-radius + approximate milliseconds at rally 0/3/6 + early-buffer duration.
+### Weapon seam
+one placeholder R15 weapon and integration boundary.
 
-### Hit-confirm
-exact authoritative event and client micro-feedback.
-
-### Miss/hit
-how body hit is detected/presented/cleaned.
+### Regression
+long-rally/invariant results.
 
 ### Verification
-commands/results; `RUNTIME TESTED: ...` or `RUNTIME NOT TESTED`.
+commands/results + `RUNTIME TESTED` or `RUNTIME NOT TESTED`.
 
-### Human action
-open canonical `Fatal.rbxlx` and play 10–20 exchanges.
+### Human test
+shortest exact Studio test procedure.
 
-STOP. Do not add unrelated features or self-approve.
+### Next recommendation
+ONE highest-leverage next step only.
+
+Then STOP. Do not implement the recommendation.
