@@ -3,7 +3,6 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local DataStoreService = game:GetService("DataStoreService")
-local RunService = game:GetService("RunService")
 
 local root = ServerScriptService:WaitForChild("Game")
 local Config = require(ReplicatedStorage.Game.Shared.Config.CombatConfig)

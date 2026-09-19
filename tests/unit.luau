@@ -259,7 +259,11 @@ local first = { Id = "P:first", Alive = true, CenterPart = { Position = roblox.V
 local second = { Id = "N:second", Alive = true, CenterPart = { Position = roblox.Vector3.new(20, 4, 0) }, RootPart = { Position = roblox.Vector3.new(20, 3, 0) } }
 local alive = { first, second }
 local ballRegistry = {
-	GetAlive = function() return alive end,
+	GetAlive = function()
+		local result = {}
+		for _, subject in alive do if subject.Alive then table.insert(result, subject) end end
+		return result
+	end,
 	IsAlive = function(_, subject) return subject and subject.Alive end,
 	SetAlive = function(_, subject, value) subject.Alive = value; return true end,
 }
@@ -290,6 +294,10 @@ ballCore.CurveTravel = 99
 check(ballCore:Redirect(first, rightAim) and ballCore:GetTarget() == second and ballCore:GetRally() == 1, "redirect changes target and increments rally immediately")
 check(ballCore.Velocity.Magnitude >= 90, "post-parry speed never regresses below incoming momentum")
 check(not ballCore.Terminal and ballCore.MinTargetDistance == math.huge and ballCore.CurveTravel == 0, "redirect atomically clears the previous trajectory leg")
+local redirectPosition = ballCore.Position
+local redirectDirection = ballCore.Velocity.Unit
+ballCore:Update(1 / 120)
+check(ballCore.Velocity.Magnitude >= 90 and (ballCore.Position - redirectPosition):Dot(redirectDirection) > 0, "redirect preserves incoming momentum and advances the new leg in the next simulation step")
 check(ballCore.Velocity.Unit:Dot(right) > 0 and ballCore.Velocity.Unit:Dot(targetDirection) < 0.999, "right aim authors a right-curving initial direction")
 local leftTarget = (first.CenterPart.Position - ballCore.Position).Unit
 ballCore:Redirect(second, (leftTarget - right).Unit)
@@ -305,6 +313,21 @@ ballCore:Redirect(first, straightTarget)
 check(ballCore.Velocity.Unit:Dot(straightTarget) > 0.9999, "aim at authoritative target produces an almost straight redirect")
 ballCore:Stop()
 check(#ballCore:_ownedBalls() == 0, "V2 ball cleanup leaves no authoritative instance")
+
+first.Alive = true
+second.Alive = true
+local reacquiringBall = BallCore.new(ballRegistry, remote, remote, gameplay)
+reacquiringBall:Start(first)
+reacquiringBall.Position = roblox.Vector3.zero
+reacquiringBall.Part.Position = reacquiringBall.Position
+reacquiringBall.Velocity = roblox.Vector3.xAxis * 90
+first.Alive = false
+reacquiringBall:Update(1 / 60)
+check(reacquiringBall:IsTracking(), "invalid target reacquisition keeps the ball tracking")
+check(reacquiringBall:GetTarget() == second, "invalid target reacquires an alive combatant")
+check(reacquiringBall.Velocity.Magnitude >= 90, "invalid target reacquisition preserves momentum")
+reacquiringBall:Stop()
+first.Alive = true
 
 local rallyEvents = {}
 local rallyRemote = { FireAllClients = function(_, payload) table.insert(rallyEvents, payload) end }

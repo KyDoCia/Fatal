@@ -3,8 +3,11 @@ local UserInputService = game:GetService("UserInputService")
 local InventoryController = {}
 
 function InventoryController.Start(player, request, state)
-	local gui = player.PlayerGui:FindFirstChild("InventoryGui") or player.PlayerGui.ChildAdded:Wait()
-	while gui.Name ~= "InventoryGui" do gui = player.PlayerGui.ChildAdded:Wait() end
+	local gui = player.PlayerGui:FindFirstChild("InventoryGui")
+	while not gui do
+		local child = player.PlayerGui.ChildAdded:Wait()
+		gui = if child.Name == "InventoryGui" then child else player.PlayerGui:FindFirstChild("InventoryGui")
+	end
 	local panel = gui.Panel
 	local equip = panel.Equip
 	gui.Enabled = false

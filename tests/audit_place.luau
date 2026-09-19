@@ -39,7 +39,22 @@ local function resolve(path)
 	return value
 end
 
-for path, className in expectedScripts do assert(resolve(path).ClassName == className, "wrong class for " .. path) end
+local function sourcePath(path)
+	local shared = string.match(path, "^ReplicatedStorage%.Game%.Shared%.(.+)$")
+	if shared then return "src/shared/" .. string.gsub(shared, "%.", "/") .. ".luau" end
+	local server = string.match(path, "^ServerScriptService%.Game%.(.+)$")
+	if server then return "src/server/" .. server .. (server == "GameServer" and ".server.luau" or ".luau") end
+	local client = string.match(path, "^StarterPlayer%.StarterPlayerScripts%.Game%.(.+)$")
+	if client then return "src/client/" .. string.gsub(client, "%.", "/") .. (client == "ClientBootstrap" and ".client.luau" or ".luau") end
+end
+
+local function normalized(source) return string.gsub(source, "\r\n", "\n") end
+for path, className in expectedScripts do
+	local script = resolve(path)
+	assert(script.ClassName == className, "wrong class for " .. path)
+	local diskPath = assert(sourcePath(path), "missing source mapping for " .. path)
+	assert(normalized(script.Source) == normalized(fs.readFile(diskPath)), "stale script in canonical build: " .. path)
+end
 
 local scriptCount = 0
 for _, serviceName in { "ReplicatedStorage", "ServerScriptService", "StarterPlayer", "StarterGui", "Workspace" } do

@@ -2,6 +2,7 @@
 Thumbs.db
 *.rbxl
 *.rbxlx
+*.rbxlx.lock
 *.rbxm
 *.rbxmx
 sourcemap.json

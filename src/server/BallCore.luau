@@ -148,7 +148,8 @@ function BallCore:Update(dt, beforeStep)
 		self.MinTargetDistance = math.huge
 		self.CurveStrength = 0; self.CurveDistance = 0; self.CurveTravel = 0
 		self.Revision += 1
-		self.Velocity = (target.CenterPart.Position - self.Position).Unit * Config.SpeedForRally(self.Rally)
+		local speed = math.min(Config.Ball.MaxSpeed, math.max(self.Velocity.Magnitude, Config.SpeedForRally(self.Rally)))
+		self.Velocity = (target.CenterPart.Position - self.Position).Unit * speed
 		self.Event:FireAllClients(CombatTypes.Event(CombatTypes.EventKind.BallTargetChanged, { TargetId = target.Id, Revision = self.Revision }))
 	end
 	local bounded = math.min(dt, Config.Ball.MaxDeltaTime)
@@ -162,7 +163,7 @@ function BallCore:Update(dt, beforeStep)
 		local distance = offset.Magnitude
 		local direct = if distance > 1e-6 then offset.Unit else self.Velocity.Unit
 		local targetVelocity = self.Target.RootPart.AssemblyLinearVelocity or Vector3.zero
-		local speed = Config.SpeedForRally(self.Rally)
+		local speed = math.min(Config.Ball.MaxSpeed, math.max(self.Velocity.Magnitude, Config.SpeedForRally(self.Rally)))
 		local desired = TrajectoryMath.InterceptDirection(self.Position, speed, self.Target.CenterPart.Position, targetVelocity)
 		local contactDistance = Config.Hurt.BodyRadius + Config.Ball.Radius
 		local contactTime = math.max(0, distance - contactDistance) / math.max(speed, 1e-6)
