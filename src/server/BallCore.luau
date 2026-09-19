@@ -93,7 +93,8 @@ function BallCore:Redirect(source, aimDirection)
 	self.Target = target
 	self.Terminal = false
 	self.MinTargetDistance = math.huge
-	local speed = Config.SpeedForRally(self.Rally)
+	local incomingSpeed = self.Velocity.Magnitude
+	local speed = math.min(Config.Ball.MaxSpeed, math.max(incomingSpeed, Config.SpeedForRally(self.Rally)))
 	local targetDirection = (target.CenterPart.Position - self.Position).Unit
 	local initialDirection = targetDirection
 	if aimDirection then

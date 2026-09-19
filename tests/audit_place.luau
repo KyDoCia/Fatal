@@ -69,6 +69,7 @@ assert(#rallyChildren == 1 and rallyChildren[1].Name == "Rally" and rallyChildre
 local clientSource = resolve("StarterPlayer.StarterPlayerScripts.Game.ClientBootstrap").Source
 assert(not string.find(clientSource, 'PlayerGui"):WaitForChild("RallyGui', 1, true), "client must not infinitely wait for the StarterGui clone")
 assert(string.find(clientSource, 'StarterGui:FindFirstChild("RallyGui")', 1, true), "client must verify the canonical StarterGui source")
+assert(string.find(clientSource, "snapshotVelocity = event.Direction.Unit * event.Speed", 1, true), "confirmed redirect must replace stale visual velocity immediately")
 
 local forbiddenTokens = {
 	"FIGHT", "CRITICAL", "TIMETOIMPACT", "TARGETINDICATOR", "COMBATGUI", "ROUNDGUI",

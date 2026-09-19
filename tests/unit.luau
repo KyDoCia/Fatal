@@ -279,7 +279,13 @@ check(stepObservations >= 2, "ball exposes every bounded movement step to the de
 local targetDirection = (second.CenterPart.Position - ballCore.Position).Unit
 local right = roblox.Vector3.zAxis
 local rightAim = (targetDirection + right).Unit
+ballCore.Velocity = targetDirection * 90
+ballCore.Terminal = true
+ballCore.MinTargetDistance = 1
+ballCore.CurveTravel = 99
 check(ballCore:Redirect(first, rightAim) and ballCore:GetTarget() == second and ballCore:GetRally() == 1, "redirect changes target and increments rally immediately")
+check(ballCore.Velocity.Magnitude >= 90, "post-parry speed never regresses below incoming momentum")
+check(not ballCore.Terminal and ballCore.MinTargetDistance == math.huge and ballCore.CurveTravel == 0, "redirect atomically clears the previous trajectory leg")
 check(ballCore.Velocity.Unit:Dot(right) > 0 and ballCore.Velocity.Unit:Dot(targetDirection) < 0.999, "right aim authors a right-curving initial direction")
 local leftTarget = (first.CenterPart.Position - ballCore.Position).Unit
 ballCore:Redirect(second, (leftTarget - right).Unit)
@@ -301,7 +307,8 @@ local rallyRemote = { FireAllClients = function(_, payload) table.insert(rallyEv
 local rallyBall = BallCore.new(ballRegistry, remote, rallyRemote, gameplay)
 rallyBall:Start(first)
 for expected = 1, 130 do
-	check(rallyBall:Redirect(rallyBall:GetTarget()) and rallyBall:GetRally() == expected, "long rally increments exactly once at exchange " .. expected)
+	local incoming = rallyBall.Velocity.Magnitude
+	check(rallyBall:Redirect(rallyBall:GetTarget()) and rallyBall:GetRally() == expected and rallyBall.Velocity.Magnitude >= incoming, "long rally preserves momentum at exchange " .. expected)
 end
 local rallyChanged = 0
 for _, event in rallyEvents do if event.Kind == combatTypes.EventKind.RallyChanged then rallyChanged += 1 end end

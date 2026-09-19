@@ -122,6 +122,12 @@ combatEvent.OnClientEvent:Connect(function(event)
 		if typeof(event.Position) ~= "Vector3" then return end
 		local ball = currentBall
 		if not ball or not ball.Parent then return end
+		if typeof(event.Direction) == "Vector3" and type(event.Speed) == "number" then
+			snapshotPosition = event.Position
+			snapshotVelocity = event.Direction.Unit * event.Speed
+			snapshotAt = os.clock()
+			ball.Position = event.Position
+		end
 		pulseRevision += 1
 		local pulse = pulseRevision
 		local intensity = Effects.ImpactIntensity(event.Speed or snapshotVelocity.Magnitude, event.Rally, Config.Ball.MaxSpeed)
