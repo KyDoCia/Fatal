@@ -14,6 +14,7 @@ function BallCore.new(registry, snapshotRemote, combatEvent, gameplay, targetSel
 		TargetSelector = targetSelector, Definition = BallDefinitions.StandardBall,
 		Target = nil, Rally = 0, Revision = 0, SnapshotClock = 0,
 		Terminal = false, MinTargetDistance = math.huge,
+		CurveStrength = 0, CurveDistance = 0, CurveTravel = 0,
 	}, BallCore)
 end
 
@@ -47,6 +48,7 @@ function BallCore:Start(preferredTarget)
 	self.Target = target
 	self.Terminal = false
 	self.MinTargetDistance = math.huge
+	self.CurveStrength = 0; self.CurveDistance = 0; self.CurveTravel = 0
 	self.Rally = 0
 	self.Revision += 1
 	self.Velocity = (target.CenterPart.Position - self.Position).Unit * Config.Ball.BaseSpeed
@@ -97,6 +99,10 @@ function BallCore:Redirect(source, aimDirection)
 	if aimDirection then
 		initialDirection = TrajectoryMath.RotateTowards(targetDirection, aimDirection, math.rad(Config.Parry.MaxAimAngleDegrees))
 	end
+	self.CurveStrength = TrajectoryMath.CurveStrength(initialDirection, targetDirection, math.rad(Config.Parry.MaxAimAngleDegrees))
+	local available = math.max(0, (target.CenterPart.Position - self.Position).Magnitude - Config.Ball.TerminalDistance)
+	self.CurveDistance = available * (Config.Ball.CurveDistanceMinimum + Config.Ball.CurveDistanceStrength * self.CurveStrength)
+	self.CurveTravel = 0
 	self.Velocity = initialDirection * speed
 	self.Event:FireAllClients(CombatTypes.Event(CombatTypes.EventKind.BallTargetChanged, { TargetId = target.Id, Revision = self.Revision }))
 	self.Event:FireAllClients(CombatTypes.Event(CombatTypes.EventKind.RallyChanged, { Rally = self.Rally }))
@@ -139,6 +145,7 @@ function BallCore:Update(dt, beforeStep)
 		self.Target = target
 		self.Terminal = false
 		self.MinTargetDistance = math.huge
+		self.CurveStrength = 0; self.CurveDistance = 0; self.CurveTravel = 0
 		self.Revision += 1
 		self.Velocity = (target.CenterPart.Position - self.Position).Unit * Config.SpeedForRally(self.Rally)
 		self.Event:FireAllClients(CombatTypes.Event(CombatTypes.EventKind.BallTargetChanged, { TargetId = target.Id, Revision = self.Revision }))
@@ -163,12 +170,15 @@ function BallCore:Update(dt, beforeStep)
 			self.Terminal = true
 		end
 		self.MinTargetDistance = math.min(self.MinTargetDistance, distance)
-		local turnRate = if self.Terminal then Config.Ball.TerminalTurnRate else Config.Ball.HomingRate
+		local progress = if self.CurveDistance > 1e-6 then self.CurveTravel / self.CurveDistance else 1
+		local curveMultiplier = TrajectoryMath.CurveSteeringMultiplier(self.CurveStrength, progress, Config.Ball.CurveSteeringRetention)
+		local turnRate = if self.Terminal then Config.Ball.TerminalTurnRate else Config.Ball.HomingRate * curveMultiplier
 		local direction = TrajectoryMath.RotateTowards(self.Velocity.Unit, desired, turnRate * stepDt)
 		self.Velocity = direction * speed
 		local segment = self.Velocity * stepDt
 		if self:_hit(segment) then break end
 		self.Position += segment
+		self.CurveTravel += segment.Magnitude
 	end
 	if self.Part then self.Part.CFrame = CFrame.new(self.Position) end
 	self.SnapshotClock += dt

@@ -1,5 +1,20 @@
 local TrajectoryMath = {}
 
+function TrajectoryMath.SmoothStep01(value)
+	local x = math.clamp(value, 0, 1)
+	return x * x * (3 - 2 * x)
+end
+
+function TrajectoryMath.CurveStrength(initialDirection, targetDirection, maximumAngle)
+	local angle = math.acos(math.clamp(initialDirection:Dot(targetDirection), -1, 1))
+	return TrajectoryMath.SmoothStep01(angle / math.max(maximumAngle, 1e-6))
+end
+
+function TrajectoryMath.CurveSteeringMultiplier(strength, progress, retention)
+	local held = 1 - math.clamp(strength, 0, 1) * math.clamp(retention, 0, 0.95)
+	return held + (1 - held) * TrajectoryMath.SmoothStep01(progress)
+end
+
 function TrajectoryMath.InterceptDirection(projectilePosition, projectileSpeed, targetPosition, targetVelocity)
 	local offset = targetPosition - projectilePosition
 	local direct = if offset.Magnitude > 1e-6 then offset.Unit else Vector3.zero

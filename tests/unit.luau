@@ -45,15 +45,19 @@ end
 local lead = trajectory.InterceptDirection(roblox.Vector3.zero, 30, roblox.Vector3.new(30, 0, 0), roblox.Vector3.new(0, 8, 0))
 check(lead.Y > 0 and lead.X > 0, "intercept solution leads a laterally moving target")
 
-local function terminalSimulation(initialDirection, speed, moving)
-	local position = roblox.Vector3.new(-20, 0, 0)
+local function terminalSimulation(initialDirection, speed, moving, dt)
+	dt = dt or 1 / 60
+	local position = roblox.Vector3.new(-40, 0, 0)
 	local velocity = initialDirection.Unit * speed
 	local target = roblox.Vector3.zero
 	local minimum = math.huge
 	local terminal = false
-	for step = 1, 600 do
-		local dt = 1 / 60
-		local targetVelocity = if moving then roblox.Vector3.new(0, if step < 90 then 7 else -7, 0) else roblox.Vector3.zero
+	local strength = trajectory.CurveStrength(velocity.Unit, roblox.Vector3.xAxis, math.rad(config.Parry.MaxAimAngleDegrees))
+	local curveDistance = (40 - config.Ball.TerminalDistance) * (config.Ball.CurveDistanceMinimum + config.Ball.CurveDistanceStrength * strength)
+	local travel, maximumLateral, elapsed = 0, 0, 0
+	for _ = 1, math.ceil(10 / dt) do
+		elapsed += dt
+		local targetVelocity = if moving then roblox.Vector3.new(0, if elapsed < 1.5 then 7 else -7, 0) else roblox.Vector3.zero
 		target += targetVelocity * dt
 		local offset = target - position
 		local distance = offset.Magnitude
@@ -62,14 +66,26 @@ local function terminalSimulation(initialDirection, speed, moving)
 		if distance <= config.Ball.TerminalDistance or contactTime <= config.Ball.TerminalTime or distance > minimum + config.Ball.OvershootTolerance or velocity.Unit:Dot(direct) <= 0 then terminal = true end
 		minimum = math.min(minimum, distance)
 		local desired = trajectory.InterceptDirection(position, speed, target, targetVelocity)
-		local direction = trajectory.RotateTowards(velocity.Unit, desired, (terminal and config.Ball.TerminalTurnRate or config.Ball.HomingRate) * dt)
+		local progress = if curveDistance > 1e-6 then travel / curveDistance else 1
+		local multiplier = trajectory.CurveSteeringMultiplier(strength, progress, config.Ball.CurveSteeringRetention)
+		local direction = trajectory.RotateTowards(velocity.Unit, desired, (terminal and config.Ball.TerminalTurnRate or config.Ball.HomingRate * multiplier) * dt)
 		local segment = direction * speed * dt
-		if trajectory.SweptSphereVsVerticalCapsuleTime(position, segment, target, config.Hurt.BodyRadius, config.Hurt.BodyHeight, config.Ball.Radius) then return true end
+		if trajectory.SweptSphereVsVerticalCapsuleTime(position, segment, target, config.Hurt.BodyRadius, config.Hurt.BodyHeight, config.Ball.Radius) then return true, maximumLateral end
 		position += segment
+		travel += segment.Magnitude
+		maximumLateral = math.max(maximumLateral, math.sqrt(position.Y * position.Y + position.Z * position.Z))
 		velocity = direction * speed
 	end
-	return false
+	return false, maximumLateral
 end
+
+local weak = trajectory.CurveStrength(roblox.Vector3.new(1, 0.15, 0).Unit, roblox.Vector3.xAxis, math.rad(config.Parry.MaxAimAngleDegrees))
+local medium = trajectory.CurveStrength(roblox.Vector3.new(1, 0.7, 0).Unit, roblox.Vector3.xAxis, math.rad(config.Parry.MaxAimAngleDegrees))
+local strong = trajectory.CurveStrength(roblox.Vector3.new(1, 2.7, 0).Unit, roblox.Vector3.xAxis, math.rad(config.Parry.MaxAimAngleDegrees))
+check(weak < medium and medium < strong, "larger aim deviation produces smoothly increasing CurveStrength")
+local weakHit, weakArc = terminalSimulation(roblox.Vector3.new(1, 0, 0.2), config.SpeedForRally(3), false)
+local strongHit, strongArc = terminalSimulation(roblox.Vector3.new(1, 0, 2.7), config.SpeedForRally(3), false)
+check(weakHit and strongHit and strongArc > weakArc * 2, "strong aim produces a visibly larger arc and still intercepts")
 
 for _, speed in { config.Ball.BaseSpeed, config.SpeedForRally(6), config.Ball.MaxSpeed } do
 	for _, direction in {
@@ -78,6 +94,12 @@ for _, speed in { config.Ball.BaseSpeed, config.SpeedForRally(6), config.Ball.Ma
 	} do check(terminalSimulation(direction, speed, false), "terminal intercept prevents stable orbit at speed " .. speed) end
 end
 check(terminalSimulation(roblox.Vector3.new(1, 0, 1.2), config.SpeedForRally(3), true), "lead reacquires a target that changes lateral direction")
+local reproducibleA, arcA = terminalSimulation(roblox.Vector3.new(1, 0, 1.8), config.SpeedForRally(3), false, 1 / 60)
+local reproducibleB, arcB = terminalSimulation(roblox.Vector3.new(1, 0, 1.8), config.SpeedForRally(3), false, 1 / 60)
+check(reproducibleA and reproducibleB and math.abs(arcA - arcB) < 1e-6, "identical aim produces deterministic curve geometry")
+local hit30, arc30 = terminalSimulation(roblox.Vector3.new(1, 0, 1.8), config.SpeedForRally(3), false, 1 / 30)
+local hit120, arc120 = terminalSimulation(roblox.Vector3.new(1, 0, 1.8), config.SpeedForRally(3), false, 1 / 120)
+check(hit30 and hit120 and math.abs(arc30 - arc120) < 1.5, "spatial curve remains consistent across frame rates")
 
 local configToken, mathToken, typesToken = {}, {}, {}
 local replicated = { Game = { Shared = { Config = { CombatConfig = configToken }, Combat = { CombatTypes = typesToken }, Util = { TrajectoryMath = mathToken } } } }
