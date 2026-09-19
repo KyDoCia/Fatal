@@ -13,6 +13,8 @@
           "ParryIntent": { "$className": "RemoteEvent" },
           "BallSnapshot": { "$className": "RemoteEvent" },
           "CombatEvent": { "$className": "RemoteEvent" }
+          ,"InventoryRequest": { "$className": "RemoteEvent" },
+          "InventoryState": { "$className": "RemoteEvent" }
         },
         "Shared": { "$path": "src/shared" },
         "Assets": {
@@ -35,7 +37,8 @@
         "TrainingOpponent": { "$path": "src/server/TrainingOpponent.luau" },
         "DuelService": { "$path": "src/server/DuelService.luau" },
         "ProfileService": { "$path": "src/server/ProfileService.luau" },
-        "TargetSelector": { "$path": "src/server/TargetSelector.luau" }
+        "TargetSelector": { "$path": "src/server/TargetSelector.luau" },
+        "InventoryService": { "$path": "src/server/InventoryService.luau" }
       }
     },
     "StarterPlayer": {
@@ -46,6 +49,7 @@
           "$className": "Folder",
           "$ignoreUnknownInstances": false,
           "ClientBootstrap": { "$path": "src/client/ClientBootstrap.client.luau" },
+          "InventoryController": { "$path": "src/client/InventoryController.luau" },
           "Input": { "$path": "src/client/Input" },
           "Weapons": { "$path": "src/client/Weapons" }
         }
@@ -54,7 +58,8 @@
     "StarterGui": {
       "$ignoreUnknownInstances": false,
       "$properties": { "ResetPlayerGuiOnSpawn": false },
-      "RallyGui": { "$path": "assets/RallyGui.rbxm" }
+      "RallyGui": { "$path": "assets/RallyGui.rbxm" },
+      "InventoryGui": { "$path": "assets/InventoryGui.rbxm" }
     },
     "Workspace": {
 	  "$ignoreUnknownInstances": false,

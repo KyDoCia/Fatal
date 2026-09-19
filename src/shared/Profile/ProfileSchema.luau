@@ -6,7 +6,7 @@ function Schema.New()
 		Version = Schema.Version,
 		Stats = { Wins = 0 },
 		Currency = { Coins = 0, Gems = 0 },
-		Inventory = {},
+		Inventory = { Weapons = { TrainingBlade = true }, Balls = {}, Effects = {}, Animations = {} },
 		Equipped = { Weapon = "TrainingBlade", Ball = "StandardBall" },
 	}
 end
@@ -19,6 +19,10 @@ function Schema.Normalize(value)
 		if type(value.Currency.Coins) == "number" then profile.Currency.Coins = math.max(0, math.floor(value.Currency.Coins)) end
 		if type(value.Currency.Gems) == "number" then profile.Currency.Gems = math.max(0, math.floor(value.Currency.Gems)) end
 	end
+	if type(value.Inventory) == "table" and type(value.Inventory.Weapons) == "table" then
+		for id, owned in value.Inventory.Weapons do if type(id) == "string" and owned == true then profile.Inventory.Weapons[id] = true end end
+	end
+	if type(value.Equipped) == "table" and type(value.Equipped.Weapon) == "string" and profile.Inventory.Weapons[value.Equipped.Weapon] then profile.Equipped.Weapon = value.Equipped.Weapon end
 	return profile
 end
 

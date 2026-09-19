@@ -14,17 +14,21 @@ local TrainingOpponent = require(root:WaitForChild("TrainingOpponent"))
 local DuelService = require(root:WaitForChild("DuelService"))
 local ProfileService = require(root:WaitForChild("ProfileService"))
 local TargetSelector = require(root:WaitForChild("TargetSelector"))
+local InventoryService = require(root:WaitForChild("InventoryService"))
 
 local remotes = ReplicatedStorage:WaitForChild("Game"):WaitForChild("Remotes")
 local parryIntent = remotes:WaitForChild("ParryIntent")
 local snapshot = remotes:WaitForChild("BallSnapshot")
 local combatEvent = remotes:WaitForChild("CombatEvent")
+local inventoryRequest = remotes:WaitForChild("InventoryRequest")
+local inventoryState = remotes:WaitForChild("InventoryState")
 local gameplay = workspace:WaitForChild("Game"):WaitForChild("Arena"):WaitForChild("Gameplay")
 local npcContainer = gameplay:WaitForChild("NPCs")
 
 Players.CharacterAutoLoads = false
 local registry = Registry.new()
 local profileStore = ProfileService.new(if RunService:IsStudio() then nil else DataStoreService:GetDataStore("FatalProfiles_v1"))
+local inventory = InventoryService.new(profileStore, inventoryState)
 local combat = CombatCore.new(registry, combatEvent)
 local ball = BallCore.new(registry, snapshot, combatEvent, gameplay, TargetSelector)
 combat:SetBall(ball)
@@ -37,6 +41,7 @@ local function addPlayer(player)
 	if registry:GetByPlayer(player) then return end
 	registry:RegisterPlayer(player)
 	profileStore:Load(player)
+	inventory:Sync(player)
 	playerConnections[player] = player.CharacterAdded:Connect(function(character)
 		local combatant = registry:GetByPlayer(player)
 		if combatant then
@@ -67,6 +72,10 @@ local connections = {
 		if now < (intentReadyAt[player] or 0) then return end
 		intentReadyAt[player] = now + Config.Parry.IntentMinInterval
 		combat:TryParry(registry:GetByPlayer(player))
+	end),
+	inventoryRequest.OnServerEvent:Connect(function(player, action, itemId)
+		if action == "EquipWeapon" then inventory:Equip(player, itemId)
+		elseif action == "GetState" then inventory:Sync(player) end
 	end),
 	RunService.Heartbeat:Connect(function(dt) duel:Update(dt) end),
 }

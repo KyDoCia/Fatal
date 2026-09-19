@@ -3,18 +3,23 @@ local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
+local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local replicatedGame = ReplicatedStorage:WaitForChild("Game")
 local Config = require(replicatedGame:WaitForChild("Shared"):WaitForChild("Config"):WaitForChild("CombatConfig"))
 local CombatTypes = require(replicatedGame.Shared.Combat.CombatTypes)
 local WeaponDefinitions = require(replicatedGame.Shared.Weapons.WeaponDefinitions)
+local BallDefinition = require(replicatedGame.Shared.Balls.BallDefinitions).StandardBall
 local CombatInputController = require(script.Parent.Input.CombatInputController)
 local WeaponPresentationController = require(script.Parent.Weapons.WeaponPresentationController)
+local InventoryController = require(script.Parent.InventoryController)
 local remotes = replicatedGame:WaitForChild("Remotes")
 local parryIntent = remotes:WaitForChild("ParryIntent")
 local snapshot = remotes:WaitForChild("BallSnapshot")
 local combatEvent = remotes:WaitForChild("CombatEvent")
+local inventoryRequest = remotes:WaitForChild("InventoryRequest")
+local inventoryState = remotes:WaitForChild("InventoryState")
 
 local function awaitChild(parent, name)
 	local found = parent:FindFirstChild(name)
@@ -31,12 +36,17 @@ local rallyGui = awaitChild(playerGui, "RallyGui")
 local rallyLabel = awaitChild(rallyGui, "Rally")
 local baseColor = Color3.fromRGB(255, 76, 58)
 local currentBall = nil
+local authoritativeBall = nil
+local snapshotPosition = Vector3.zero
+local snapshotVelocity = Vector3.zero
+local snapshotAt = 0
 local orientedRevision = -1
 local pulseRevision = 0
 
 local input = CombatInputController.new(parryIntent)
 input:Bind()
 local weapon = WeaponPresentationController.new(player, WeaponDefinitions.TrainingBlade)
+InventoryController.Start(player, inventoryRequest, inventoryState)
 
 local function setBallReadability(ball, intensity)
 	if not ball or not ball.Parent then return end
@@ -54,7 +64,22 @@ end
 
 snapshot.OnClientEvent:Connect(function(state)
 	if type(state) ~= "table" or type(state.Rally) ~= "number" then return end
-	currentBall = if typeof(state.Ball) == "Instance" and state.Ball:IsA("BasePart") then state.Ball else nil
+	local incoming = if typeof(state.Ball) == "Instance" and state.Ball:IsA("BasePart") then state.Ball else nil
+	if incoming ~= authoritativeBall then
+		if currentBall then currentBall:Destroy() end
+		authoritativeBall = incoming
+		currentBall = nil
+		if incoming then
+			incoming.LocalTransparencyModifier = 1
+			currentBall = incoming:Clone()
+			currentBall.Name = "BallPresentation"
+			currentBall:SetAttribute("FatalV2Ball", nil)
+			currentBall.Parent = workspace
+		end
+	end
+	if typeof(state.Position) == "Vector3" then snapshotPosition = state.Position end
+	if typeof(state.Velocity) == "Vector3" then snapshotVelocity = state.Velocity end
+	snapshotAt = os.clock()
 	if currentBall and pulseRevision == 0 then
 		local character = player.Character
 		local center = character and character:FindFirstChild("UpperTorso")
@@ -77,6 +102,15 @@ snapshot.OnClientEvent:Connect(function(state)
 			camera.CFrame = CFrame.lookAt(root.Position - root.CFrame.LookVector * 10 + Vector3.new(0, 5, 0), focus)
 		end
 	end
+end)
+
+RunService.RenderStepped:Connect(function(dt)
+	if not currentBall or not currentBall.Parent then return end
+	local predicted = snapshotPosition + snapshotVelocity * math.min(os.clock() - snapshotAt, 0.1)
+	local alpha = 1 - math.exp(-24 * dt)
+	currentBall.Position = currentBall.Position:Lerp(predicted, alpha)
+	local trail = currentBall:FindFirstChildOfClass("Trail")
+	if trail then trail.Lifetime = BallDefinition.Trail.BaseLifetime + math.clamp(snapshotVelocity.Magnitude / Config.Ball.MaxSpeed, 0, 1) * BallDefinition.Trail.SpeedLifetime end
 end)
 
 combatEvent.OnClientEvent:Connect(function(event)

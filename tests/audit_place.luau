@@ -18,9 +18,11 @@ local expectedScripts = {
 	["ServerScriptService.Game.DuelService"] = "ModuleScript",
 	["ServerScriptService.Game.ProfileService"] = "ModuleScript",
 	["ServerScriptService.Game.TargetSelector"] = "ModuleScript",
+	["ServerScriptService.Game.InventoryService"] = "ModuleScript",
 	["StarterPlayer.StarterPlayerScripts.Game.ClientBootstrap"] = "LocalScript",
 	["StarterPlayer.StarterPlayerScripts.Game.Input.CombatInputController"] = "ModuleScript",
 	["StarterPlayer.StarterPlayerScripts.Game.Weapons.WeaponPresentationController"] = "ModuleScript",
+	["StarterPlayer.StarterPlayerScripts.Game.InventoryController"] = "ModuleScript",
 }
 
 local function resolve(path)
@@ -44,10 +46,10 @@ for _, serviceName in { "ReplicatedStorage", "ServerScriptService", "StarterPlay
 		end
 	end
 end
-assert(scriptCount == 18, "expected exactly 18 canonical vertical-slice scripts")
+assert(scriptCount == 20, "expected exactly 20 canonical quality-pass scripts")
 
 local replicated = place:GetService("ReplicatedStorage").Game
-for _, name in { "ParryIntent", "BallSnapshot", "CombatEvent" } do assert(replicated.Remotes[name]:IsA("RemoteEvent"), "missing remote " .. name) end
+for _, name in { "ParryIntent", "BallSnapshot", "CombatEvent", "InventoryRequest", "InventoryState" } do assert(replicated.Remotes[name]:IsA("RemoteEvent"), "missing remote " .. name) end
 assert(#replicated.Assets:GetChildren() == 2, "foundation assets must contain one ball and one presentation weapon")
 local ball = replicated.Assets.CombatBall
 assert(ball:IsA("BasePart") and (ball.Size - roblox.Vector3.one * 2).Magnitude < 1e-4, "built ball must be 2 studs on every axis")
@@ -59,8 +61,8 @@ assert(weapon:IsA("BasePart") and not weapon.CanCollide and not weapon.CanTouch 
 
 local starterGui = place:GetService("StarterGui")
 local guiChildren = starterGui:GetChildren()
-assert(#guiChildren == 1 and guiChildren[1].Name == "RallyGui" and guiChildren[1]:IsA("ScreenGui"), "normal runtime UI must contain only RallyGui")
-local rallyChildren = guiChildren[1]:GetDescendants()
+assert(#guiChildren == 2 and starterGui.RallyGui:IsA("ScreenGui") and starterGui.InventoryGui:IsA("ScreenGui"), "runtime UI must contain canonical rally and inventory GUIs")
+local rallyChildren = starterGui.RallyGui:GetDescendants()
 assert(#rallyChildren == 1 and rallyChildren[1].Name == "Rally" and rallyChildren[1]:IsA("TextLabel"), "RallyGui must contain only the small rally label")
 local clientSource = resolve("StarterPlayer.StarterPlayerScripts.Game.ClientBootstrap").Source
 assert(not string.find(clientSource, 'PlayerGui"):WaitForChild("RallyGui', 1, true), "client must not infinitely wait for the StarterGui clone")
@@ -105,4 +107,4 @@ local savedBalls = 0
 for _, value in place:GetService("Workspace"):GetDescendants() do if value:GetAttribute("FatalV2Ball") then savedBalls += 1 end end
 assert(savedBalls == 0, "saved place contains an authoritative gameplay ball")
 
-print("PASS: clean vertical-slice place has 18 scripts, multiplayer spawns, one presentation weapon, and no legacy UI")
+print("PASS: quality-pass place has 20 scripts, canonical inventory, smooth ball presentation, and no legacy UI")

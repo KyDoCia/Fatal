@@ -302,6 +302,8 @@ for _, event in duelEvents do if event.Kind == combatTypes.EventKind.DuelStateCh
 check(duelTransitions == 7 and duelEvents[1].Kind == combatTypes.EventKind.DuelStateChanged and duelEvents[1].Version == combatTypes.ProtocolVersion, "central lifecycle emits one versioned event per transition")
 
 local schema = load("src/shared/Profile/ProfileSchema.luau", {})
+local migrated = schema.Normalize({ Version = 0, Stats = { Wins = 4 }, Currency = { Coins = 8, Gems = 2 } })
+check(migrated.Inventory.Weapons.TrainingBlade == true and migrated.Equipped.Weapon == "TrainingBlade", "old profile normalization grants the default weapon safely")
 local schemaToken = {}
 local profileReplicated = { Game = { Shared = { Profile = { ProfileSchema = schemaToken } } } }
 local ProfileService = load("src/server/ProfileService.luau", {
@@ -326,5 +328,20 @@ check(not profiles:Spend(profilePlayer, "Coins", 100), "profile rejects insuffic
 check(profiles:Save(profilePlayer) and stored.Stats.Wins == 1, "profile lifecycle saves authoritative state")
 profiles:Release(profilePlayer)
 check(profiles:Get(profilePlayer) == nil, "profile lifecycle releases session state")
+
+local weaponDefinitions = load("src/shared/Weapons/WeaponDefinitions.luau", {})
+local definitionsToken = {}
+local inventoryReplicated = { Game = { Shared = { Weapons = { WeaponDefinitions = definitionsToken } } } }
+local inventoryState = { Fires = 0, FireClient = function(self) self.Fires += 1 end }
+local inventoryProfiles = { Profile = schema.New(), Get = function(self) return self.Profile end }
+local InventoryService = load("src/server/InventoryService.luau", {
+	game = { GetService = function(_, name) if name == "ReplicatedStorage" then return inventoryReplicated end; error(name) end },
+	require = function(module) if module == definitionsToken then return weaponDefinitions end; error("dependency") end,
+})
+local inventory = InventoryService.new(inventoryProfiles, inventoryState)
+check(inventory:Equip(profilePlayer, "TrainingBlade"), "owned weapon equips authoritatively")
+inventoryProfiles.Profile.Inventory.Weapons.TrainingBlade = nil
+check(not inventory:Equip(profilePlayer, "TrainingBlade"), "unowned weapon cannot equip")
+check(not inventory:Equip(profilePlayer, "MissingWeapon"), "unknown weapon cannot equip")
 
 print(string.format("PASS: %d V2 assertions", assertions))

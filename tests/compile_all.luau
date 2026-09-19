@@ -16,10 +16,12 @@ local files = {
 	"src/server/DuelService.luau",
 	"src/server/ProfileService.luau",
 	"src/server/TargetSelector.luau",
+	"src/server/InventoryService.luau",
 	"src/server/GameServer.server.luau",
 	"src/client/ClientBootstrap.client.luau",
 	"src/client/Input/CombatInputController.luau",
 	"src/client/Weapons/WeaponPresentationController.luau",
+	"src/client/InventoryController.luau",
 }
 
 for _, path in files do
