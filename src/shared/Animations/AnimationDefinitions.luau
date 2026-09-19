@@ -5,6 +5,7 @@ return table.freeze({
 	WeaponSets = table.freeze({
 		TrainingBladeDefault = table.freeze({
 			Equip = "",
+			ParryAttempt = "",
 			ParryHit = table.freeze({ Default = "", Left = "", Right = "", Up = "" }),
 			ParryMiss = table.freeze({ Default = "", Left = "", Right = "", Up = "" }),
 		}),

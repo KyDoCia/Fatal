@@ -32,7 +32,9 @@ end
 
 function WeaponPresentationController:PresentIntent(direction)
 	if self.Joint then
-		local side = if direction and direction.X < 0 then -1 else 1
+		local root = self.Player.Character and self.Player.Character:FindFirstChild("HumanoidRootPart")
+		local relative = if direction and root and root:IsA("BasePart") then root.CFrame:VectorToObjectSpace(direction) else direction
+		local side = if relative and relative.X < 0 then -1 else 1
 		self.Joint.Transform = CFrame.Angles(0, 0, math.rad(42 * side))
 		TweenService:Create(self.Joint, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Transform = CFrame.identity }):Play()
 	end

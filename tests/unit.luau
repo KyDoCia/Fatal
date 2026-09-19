@@ -19,6 +19,7 @@ local ballDefinitions = load("src/shared/Balls/BallDefinitions.luau", {})
 local effectDefinitions = load("src/shared/Effects/ParryEffectDefinitions.luau", {})
 local animationDefinitions = load("src/shared/Animations/AnimationDefinitions.luau", {})
 check(animationDefinitions.CharacterSets.Default.Jump == "" and animationDefinitions.CharacterSets.Default.Fall == "", "missing custom locomotion IDs preserve Roblox defaults")
+check(animationDefinitions.WeaponSets.TrainingBladeDefault.Equip ~= nil and animationDefinitions.WeaponSets.TrainingBladeDefault.ParryAttempt ~= nil, "weapon animation contract separates equip and immediate attempt slots")
 check(animationDefinitions.WeaponSets.TrainingBladeDefault.ParryHit.Left ~= nil and animationDefinitions.WeaponSets.TrainingBladeDefault.ParryMiss.Default ~= nil, "weapon animation contract separates directional hit and miss slots")
 check(effectDefinitions.ImpactIntensity(0, 0, config.Ball.MaxSpeed) == 0 and effectDefinitions.ImpactIntensity(config.Ball.MaxSpeed * 2, 100, config.Ball.MaxSpeed) == 1, "shared impact intensity remains normalized")
 check(effectDefinitions.Resolve("invalid") == effectDefinitions.DefaultParryEffect, "invalid equipped effect falls back to DefaultParryEffect")
@@ -406,6 +407,8 @@ check(duelTransitions == 7 and duelEvents[1].Kind == combatTypes.EventKind.DuelS
 local schema = load("src/shared/Profile/ProfileSchema.luau", {})
 local migrated = schema.Normalize({ Version = 0, Stats = { Wins = 4 }, Currency = { Coins = 8, Gems = 2 } })
 check(migrated.Inventory.Weapons.TrainingBlade == true and migrated.Equipped.Weapon == "TrainingBlade", "old profile normalization grants the default weapon safely")
+local animationProfile = schema.Normalize({ Inventory = { Animations = { OwnedSet = true } }, Equipped = { CharacterAnimationSet = "OwnedSet", WeaponAnimationSet = "UnownedSet" } })
+check(animationProfile.Inventory.Animations.OwnedSet and animationProfile.Equipped.CharacterAnimationSet == "OwnedSet" and animationProfile.Equipped.WeaponAnimationSet == "TrainingBladeDefault", "animation ownership remains separate from validated equipped sets")
 local schemaToken = {}
 local profileReplicated = { Game = { Shared = { Profile = { ProfileSchema = schemaToken } } } }
 local ProfileService = load("src/server/ProfileService.luau", {

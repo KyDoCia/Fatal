@@ -22,7 +22,16 @@ function Schema.Normalize(value)
 	if type(value.Inventory) == "table" and type(value.Inventory.Weapons) == "table" then
 		for id, owned in value.Inventory.Weapons do if type(id) == "string" and owned == true then profile.Inventory.Weapons[id] = true end end
 	end
+	if type(value.Inventory) == "table" and type(value.Inventory.Animations) == "table" then
+		for id, owned in value.Inventory.Animations do if type(id) == "string" and owned == true then profile.Inventory.Animations[id] = true end end
+	end
 	if type(value.Equipped) == "table" and type(value.Equipped.Weapon) == "string" and profile.Inventory.Weapons[value.Equipped.Weapon] then profile.Equipped.Weapon = value.Equipped.Weapon end
+	if type(value.Equipped) == "table" then
+		local characterSet = value.Equipped.CharacterAnimationSet
+		if characterSet == "Default" or (type(characterSet) == "string" and profile.Inventory.Animations[characterSet]) then profile.Equipped.CharacterAnimationSet = characterSet end
+		local weaponSet = value.Equipped.WeaponAnimationSet
+		if weaponSet == "TrainingBladeDefault" or (type(weaponSet) == "string" and profile.Inventory.Animations[weaponSet]) then profile.Equipped.WeaponAnimationSet = weaponSet end
+	end
 	return profile
 end
 
