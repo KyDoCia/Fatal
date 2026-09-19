@@ -58,6 +58,9 @@ local guiChildren = starterGui:GetChildren()
 assert(#guiChildren == 1 and guiChildren[1].Name == "RallyGui" and guiChildren[1]:IsA("ScreenGui"), "normal runtime UI must contain only RallyGui")
 local rallyChildren = guiChildren[1]:GetDescendants()
 assert(#rallyChildren == 1 and rallyChildren[1].Name == "Rally" and rallyChildren[1]:IsA("TextLabel"), "RallyGui must contain only the small rally label")
+local clientSource = resolve("StarterPlayer.StarterPlayerScripts.Game.ClientBootstrap").Source
+assert(not string.find(clientSource, 'PlayerGui"):WaitForChild("RallyGui', 1, true), "client must not infinitely wait for the StarterGui clone")
+assert(string.find(clientSource, 'StarterGui:FindFirstChild("RallyGui")', 1, true), "client must verify the canonical StarterGui source")
 
 local forbiddenTokens = {
 	"FIGHT", "CRITICAL", "TIMETOIMPACT", "TARGETINDICATOR", "COMBATGUI", "ROUNDGUI",

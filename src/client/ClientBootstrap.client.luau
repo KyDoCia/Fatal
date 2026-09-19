@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
 
 local player = Players.LocalPlayer
 local replicatedGame = ReplicatedStorage:WaitForChild("Game")
@@ -14,7 +15,20 @@ local remotes = replicatedGame:WaitForChild("Remotes")
 local parryIntent = remotes:WaitForChild("ParryIntent")
 local snapshot = remotes:WaitForChild("BallSnapshot")
 local combatEvent = remotes:WaitForChild("CombatEvent")
-local rallyLabel = player:WaitForChild("PlayerGui"):WaitForChild("RallyGui"):WaitForChild("Rally")
+
+local function awaitChild(parent, name)
+	local found = parent:FindFirstChild(name)
+	while not found do
+		local child = parent.ChildAdded:Wait()
+		if child.Name == name then found = child else found = parent:FindFirstChild(name) end
+	end
+	return found
+end
+
+assert(StarterGui:FindFirstChild("RallyGui"), "canonical StarterGui.RallyGui is missing")
+local playerGui = awaitChild(player, "PlayerGui")
+local rallyGui = awaitChild(playerGui, "RallyGui")
+local rallyLabel = awaitChild(rallyGui, "Rally")
 local baseColor = Color3.fromRGB(255, 76, 58)
 local currentBall = nil
 local orientedRevision = -1
