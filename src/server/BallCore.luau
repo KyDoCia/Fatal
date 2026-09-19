@@ -31,14 +31,6 @@ function BallCore:SelectTargetAfter(source)
 	for _, combatant in self.Registry:GetAlive() do if combatant ~= source then return combatant end end
 end
 
-function BallCore:_launchDirection(target)
-	local desired = (target.CenterPart.Position - self.Position).Unit
-	local lateral = Vector3.yAxis:Cross(desired)
-	if lateral.Magnitude < 1e-4 then lateral = Vector3.xAxis else lateral = lateral.Unit end
-	local sign = if self.Revision % 2 == 0 then 1 else -1
-	return (desired + lateral * Config.Ball.CurveDeflection * sign).Unit
-end
-
 function BallCore:Start(preferredTarget)
 	assert(self.State == "Inactive" and not self.Part, "ball already active")
 	self:_assertCount(0)
@@ -54,7 +46,7 @@ function BallCore:Start(preferredTarget)
 	self.Target = target
 	self.Rally = 0
 	self.Revision += 1
-	self.Velocity = self:_launchDirection(target) * Config.Ball.BaseSpeed
+	self.Velocity = (target.CenterPart.Position - self.Position).Unit * Config.Ball.BaseSpeed
 	local part = ReplicatedStorage.Game.Assets[self.Definition.AssetName]:Clone()
 	part.Name = "CombatBallV2"
 	part.Size = Vector3.one * Config.Ball.Radius * 2
@@ -87,7 +79,7 @@ function BallCore:GetRevision() return self.Revision end
 function BallCore:GetRally() return self.Rally end
 function BallCore:GetKinematics() return self.Position, self.Velocity end
 
-function BallCore:Redirect(source)
+function BallCore:Redirect(source, aimDirection)
 	if not self:IsTracking() or self.Target ~= source then return false end
 	local target = self:SelectTargetAfter(source)
 	if not target then return false end
@@ -95,7 +87,12 @@ function BallCore:Redirect(source)
 	self.Revision += 1
 	self.Target = target
 	local speed = Config.SpeedForRally(self.Rally)
-	self.Velocity = self:_launchDirection(target) * speed
+	local targetDirection = (target.CenterPart.Position - self.Position).Unit
+	local initialDirection = targetDirection
+	if aimDirection then
+		initialDirection = TrajectoryMath.RotateTowards(targetDirection, aimDirection, math.rad(Config.Parry.MaxAimAngleDegrees))
+	end
+	self.Velocity = initialDirection * speed
 	self.Event:FireAllClients(CombatTypes.Event(CombatTypes.EventKind.BallTargetChanged, { TargetId = target.Id, Revision = self.Revision }))
 	self.Event:FireAllClients(CombatTypes.Event(CombatTypes.EventKind.RallyChanged, { Rally = self.Rally }))
 	self:Publish()

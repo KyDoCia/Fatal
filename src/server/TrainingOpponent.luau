@@ -42,7 +42,7 @@ function TrainingOpponent:Update()
 	if not TrajectoryMath.IsApproaching(position, velocity, center, Config.Parry.ApproachEpsilon) then return end
 	if distance <= Config.NPC.ReactionRadius then
 		self.AttemptedRevision = revision
-		self.Combat:TryParry(actor)
+		self.Combat:TryParry(actor, nil)
 	end
 end
 

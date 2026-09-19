@@ -7,7 +7,6 @@ local Config = {
 		MaxSpeed = 140,
 		SpeedPerRally = 4,
 		HomingRate = 2.4,
-		CurveDeflection = 0.32,
 		MaxDeltaTime = 0.1,
 		MaxTravelPerStep = 1.5,
 		SnapshotInterval = 1 / 20,
@@ -17,6 +16,7 @@ local Config = {
 		EarlyBuffer = 0.12,
 		Cooldown = 0.1,
 		IntentMinInterval = 0.025,
+		MaxAimAngleDegrees = 55,
 		ApproachEpsilon = 0.1,
 	},
 	Hurt = {

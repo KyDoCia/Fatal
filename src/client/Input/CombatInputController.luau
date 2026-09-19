@@ -11,7 +11,12 @@ function CombatInputController:Bind()
 	assert(not self.Bound, "combat input already bound")
 	self.Bound = true
 	ContextActionService:BindAction("CombatParry", function(_, state)
-		if state == Enum.UserInputState.Begin then self.Remote:FireServer() end
+		if state == Enum.UserInputState.Begin then
+			local camera = workspace.CurrentCamera
+			local viewport = camera and camera.ViewportSize or Vector2.zero
+			local ray = camera and camera:ViewportPointToRay(viewport.X * 0.5, viewport.Y * 0.5)
+			self.Remote:FireServer(ray and ray.Direction or nil)
+		end
 		return Enum.ContextActionResult.Sink
 	end, false, Enum.UserInputType.MouseButton1, Enum.KeyCode.F)
 end

@@ -67,11 +67,11 @@ for _, player in Players:GetPlayers() do addPlayer(player) end
 local connections = {
 	Players.PlayerAdded:Connect(addPlayer),
 	Players.PlayerRemoving:Connect(removePlayer),
-	parryIntent.OnServerEvent:Connect(function(player)
+	parryIntent.OnServerEvent:Connect(function(player, aimDirection)
 		local now = workspace:GetServerTimeNow()
 		if now < (intentReadyAt[player] or 0) then return end
 		intentReadyAt[player] = now + Config.Parry.IntentMinInterval
-		combat:TryParry(registry:GetByPlayer(player))
+		combat:TryParry(registry:GetByPlayer(player), aimDirection)
 	end),
 	inventoryRequest.OnServerEvent:Connect(function(player, action, itemId)
 		if action == "EquipWeapon" then inventory:Equip(player, itemId)

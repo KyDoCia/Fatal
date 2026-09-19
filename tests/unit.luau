@@ -50,13 +50,14 @@ local registry = { IsAlive = function(_, subject) return subject and subject.Ali
 local position = roblox.Vector3.new(10, 0, 0)
 local velocity = roblox.Vector3.new(-50, 0, 0)
 local redirects = 0
+local lastAim = nil
 local ball = {
 	IsTracking = function() return true end,
 	GetTarget = function() return actor end,
 	GetRevision = function() return 3 end,
 	GetRally = function() return redirects end,
 	GetKinematics = function() return position, velocity end,
-	Redirect = function() redirects += 1; return true end,
+	Redirect = function(_, _, aim) lastAim = aim; redirects += 1; return true end,
 }
 local firedEvents = {}
 local events = { FireAllClients = function(_, payload) table.insert(firedEvents, payload) end }
@@ -87,6 +88,9 @@ local player = { Id = "P:2", Kind = "Player", Alive = true, CenterPart = { Posit
 local outOfRange = fresh(player, 17, -1)
 local okRange, reasonRange = outOfRange:TryParry(player)
 check(not okRange and reasonRange == "OUT_OF_RANGE", "defensive radius rejects early intent")
+local redirectsBeforeFailedAim = redirects
+outOfRange:TryParry(player, roblox.Vector3.xAxis)
+check(redirects == redirectsBeforeFailedAim, "aim cannot alter the ball when parry fails")
 local outgoing = fresh(player, 8, 1)
 local okDirection, reasonDirection = outgoing:TryParry(player)
 check(not okDirection and reasonDirection == "NOT_APPROACHING", "current outgoing ball cannot be parried")
@@ -94,6 +98,12 @@ local npc = { Id = "N:TrainingOpponent", Kind = "NPC", Alive = true, CenterPart 
 local shared = fresh(npc, 8, -1)
 local npcAccepted = shared:TryParry(npc)
 check(npcAccepted, "Player and NPC share the same TryParry path")
+local invalidAimPlayer = { Id = "P:invalidAim", Kind = "Player", Alive = true, CenterPart = { Position = roblox.Vector3.zero } }
+local invalidAimCombat = fresh(invalidAimPlayer, 8, -1)
+lastAim = roblox.Vector3.xAxis
+local invalidAccepted, invalidReason = invalidAimCombat:TryParry(invalidAimPlayer, "spoofed")
+check(invalidAccepted, "invalid aim still uses safe gameplay fallback: " .. tostring(invalidReason))
+check(lastAim == nil, "invalid aim is not forwarded into redirect")
 
 local bufferedPlayer = { Id = "P:buffer", Kind = "Player", Alive = true, CenterPart = { Position = roblox.Vector3.zero } }
 local buffered = fresh(bufferedPlayer, 15, -1)
@@ -196,14 +206,30 @@ ballCore:Start(first)
 check(#ballCore:_ownedBalls() == 1, "exactly one authoritative V2 ball spawns")
 check((ballCore.Part.Size - roblox.Vector3.one * config.Ball.Radius * 2).Magnitude < 1e-4, "spawned ball visual matches authoritative diameter")
 local directOpening = (first.CenterPart.Position - ballCore.Position).Unit
-check(ballCore.Velocity.Unit:Dot(directOpening) < 0.999, "authoritative launch begins with a deterministic readable curve")
+check(ballCore.Velocity.Unit:Dot(directOpening) > 0.999, "initial serve uses safe target direction without invented curvature")
 local launchDistance = (ballCore.Position - first.CenterPart.Position).Magnitude
 local actualSeparation = (first.CenterPart.Position - second.CenterPart.Position).Magnitude
 check(math.abs(launchDistance - (actualSeparation - config.Ball.LaunchOffset)) < 1e-4 and math.abs((launchDistance - config.Parry.DefensiveRadius) / ballCore.Velocity.Magnitude - config.FirstApproachSeconds(actualSeparation)) < 1e-4, "actual first launch matches geometry-derived approach timing")
 local stepObservations = 0
 ballCore:Update(0.1, function() stepObservations += 1 end)
 check(stepObservations >= 2, "ball exposes every bounded movement step to the deterministic NPC decision")
-check(ballCore:Redirect(first) and ballCore:GetTarget() == second and ballCore:GetRally() == 1, "redirect changes target and increments rally immediately")
+local targetDirection = (second.CenterPart.Position - ballCore.Position).Unit
+local right = roblox.Vector3.zAxis
+local rightAim = (targetDirection + right).Unit
+check(ballCore:Redirect(first, rightAim) and ballCore:GetTarget() == second and ballCore:GetRally() == 1, "redirect changes target and increments rally immediately")
+check(ballCore.Velocity.Unit:Dot(right) > 0 and ballCore.Velocity.Unit:Dot(targetDirection) < 0.999, "right aim authors a right-curving initial direction")
+local leftTarget = (first.CenterPart.Position - ballCore.Position).Unit
+ballCore:Redirect(second, (leftTarget - right).Unit)
+check(ballCore.Velocity.Unit:Dot(right) < 0, "left aim authors a left-curving initial direction")
+local upTarget = (second.CenterPart.Position - ballCore.Position).Unit
+ballCore:Redirect(first, (upTarget + roblox.Vector3.yAxis).Unit)
+check(ballCore.Velocity.Unit.Y > 0, "upward aim authors an upper arc")
+local extremeTarget = (first.CenterPart.Position - ballCore.Position).Unit
+ballCore:Redirect(second, -extremeTarget)
+check(math.acos(math.clamp(ballCore.Velocity.Unit:Dot(extremeTarget), -1, 1)) <= math.rad(config.Parry.MaxAimAngleDegrees) + 1e-5, "extreme aim is clamped to the authoritative safe cone")
+local straightTarget = (second.CenterPart.Position - ballCore.Position).Unit
+ballCore:Redirect(first, straightTarget)
+check(ballCore.Velocity.Unit:Dot(straightTarget) > 0.9999, "aim at authoritative target produces an almost straight redirect")
 ballCore:Stop()
 check(#ballCore:_ownedBalls() == 0, "V2 ball cleanup leaves no authoritative instance")
 

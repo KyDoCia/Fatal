@@ -37,9 +37,16 @@ function CombatCore:_result(actor, accepted, reason, metrics, mode)
 	return accepted, reason
 end
 
-function CombatCore:_redirect(actor, metrics, mode, now)
+local function validatedAim(value)
+	if typeof(value) ~= "Vector3" or value.Magnitude < 1e-4 then return nil end
+	if value.X ~= value.X or value.Y ~= value.Y or value.Z ~= value.Z then return nil end
+	if math.abs(value.X) == math.huge or math.abs(value.Y) == math.huge or math.abs(value.Z) == math.huge then return nil end
+	return value.Unit
+end
+
+function CombatCore:_redirect(actor, metrics, mode, now, aimDirection)
 	if now < (self.ReadyAt[actor.Id] or 0) then return self:_result(actor, false, "COOLDOWN", metrics, mode) end
-	if not self.Ball:Redirect(actor) then return self:_result(actor, false, "REDIRECT_REJECTED", metrics, mode) end
+	if not self.Ball:Redirect(actor, validatedAim(aimDirection)) then return self:_result(actor, false, "REDIRECT_REJECTED", metrics, mode) end
 	self.ReadyAt[actor.Id] = now + Config.Parry.Cooldown
 	self.Pending[actor.Id] = nil
 	self.Event:FireAllClients(CombatTypes.Event(CombatTypes.EventKind.ParryConfirmed, {
@@ -49,20 +56,20 @@ function CombatCore:_redirect(actor, metrics, mode, now)
 	return self:_result(actor, true, "PARRIED", metrics, mode)
 end
 
-function CombatCore:TryParry(actor)
+function CombatCore:TryParry(actor, aimDirection)
 	if not self.Active or not self.Ball or not self.Ball:IsTracking() then return self:_result(actor, false, "INACTIVE") end
 	if not self.Registry:IsAlive(actor) then return self:_result(actor, false, "DEAD") end
 	if self.Ball:GetTarget() ~= actor then return self:_result(actor, false, "NOT_TARGET") end
 	local now = workspace:GetServerTimeNow()
 	local metrics = self:_metrics(actor)
 	if metrics.Approach <= Config.Parry.ApproachEpsilon then return self:_result(actor, false, "NOT_APPROACHING", metrics) end
-	if metrics.Distance <= Config.Parry.DefensiveRadius then return self:_redirect(actor, metrics, "IMMEDIATE", now) end
+	if metrics.Distance <= Config.Parry.DefensiveRadius then return self:_redirect(actor, metrics, "IMMEDIATE", now, aimDirection) end
 	if actor.Kind ~= "Player" then return self:_result(actor, false, "OUT_OF_RANGE", metrics) end
 	local pending = self.Pending[actor.Id]
 	if pending and now <= pending.ExpiresAt then return self:_result(actor, false, "PENDING", metrics) end
 	local secondsToRange = (metrics.Distance - Config.Parry.DefensiveRadius) / metrics.Approach
 	if secondsToRange > Config.Parry.EarlyBuffer then return self:_result(actor, false, "OUT_OF_RANGE", metrics) end
-	self.Pending[actor.Id] = { Actor = actor, ExpiresAt = now + Config.Parry.EarlyBuffer, Revision = self.Ball:GetRevision() }
+	self.Pending[actor.Id] = { Actor = actor, AimDirection = validatedAim(aimDirection), ExpiresAt = now + Config.Parry.EarlyBuffer, Revision = self.Ball:GetRevision() }
 	return self:_result(actor, true, "BUFFERED", metrics, "PENDING")
 end
 
@@ -81,7 +88,7 @@ function CombatCore:UpdatePending()
 			if metrics.Approach <= Config.Parry.ApproachEpsilon then
 				self.Pending[id] = nil
 			elseif metrics.Distance <= Config.Parry.DefensiveRadius then
-				self:_redirect(actor, metrics, "BUFFERED", now)
+				self:_redirect(actor, metrics, "BUFFERED", now, pending.AimDirection)
 			end
 		end
 	end
