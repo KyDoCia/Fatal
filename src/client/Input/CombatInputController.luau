@@ -3,8 +3,8 @@ local ContextActionService = game:GetService("ContextActionService")
 local CombatInputController = {}
 CombatInputController.__index = CombatInputController
 
-function CombatInputController.new(parryIntent)
-	return setmetatable({ Remote = parryIntent, Bound = false }, CombatInputController)
+function CombatInputController.new(parryIntent, onIntent)
+	return setmetatable({ Remote = parryIntent, OnIntent = onIntent, Bound = false }, CombatInputController)
 end
 
 function CombatInputController:Bind()
@@ -15,7 +15,9 @@ function CombatInputController:Bind()
 			local camera = workspace.CurrentCamera
 			local viewport = camera and camera.ViewportSize or Vector2.zero
 			local ray = camera and camera:ViewportPointToRay(viewport.X * 0.5, viewport.Y * 0.5)
-			self.Remote:FireServer(ray and ray.Direction or nil)
+			local direction = ray and ray.Direction or nil
+			if self.OnIntent then self.OnIntent(direction) end
+			self.Remote:FireServer(direction)
 		end
 		return Enum.ContextActionResult.Sink
 	end, false, Enum.UserInputType.MouseButton1, Enum.KeyCode.F)

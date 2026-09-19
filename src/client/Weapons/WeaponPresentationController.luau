@@ -1,4 +1,5 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local WeaponPresentationController = {}
 WeaponPresentationController.__index = WeaponPresentationController
@@ -23,12 +24,11 @@ function WeaponPresentationController:Equip(character)
 	model.Massless = true
 	model.CFrame = hand.CFrame * self.Definition.Grip
 	model.Parent = character
-	local weld = Instance.new("WeldConstraint")
-	weld.Part0 = hand
-	weld.Part1 = model
-	weld.Parent = model
+	local weld = Instance.new("Motor6D")
+	weld.Name = "WeaponGrip"; weld.Part0 = hand; weld.Part1 = model; weld.C0 = self.Definition.Grip; weld.Parent = hand
 	self.Model = model
-	local animationId = self.Definition.Animations.Parry
+	self.Joint = weld
+	local animationId = self.Definition.Animations.ParryAnimations[1]
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
 	if animator and animationId ~= "" then
@@ -36,6 +36,14 @@ function WeaponPresentationController:Equip(character)
 		animation.AnimationId = animationId
 		self.Track = animator:LoadAnimation(animation)
 		animation:Destroy()
+	end
+end
+
+function WeaponPresentationController:PresentIntent(direction)
+	if self.Joint then
+		local side = if direction and direction.X < 0 then -1 else 1
+		self.Joint.Transform = CFrame.Angles(0, 0, math.rad(42 * side))
+		TweenService:Create(self.Joint, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Transform = CFrame.identity }):Play()
 	end
 end
 

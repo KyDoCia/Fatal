@@ -1,6 +1,4 @@
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
 local RunService = game:GetService("RunService")
@@ -11,6 +9,7 @@ local Config = require(replicatedGame:WaitForChild("Shared"):WaitForChild("Confi
 local CombatTypes = require(replicatedGame.Shared.Combat.CombatTypes)
 local WeaponDefinitions = require(replicatedGame.Shared.Weapons.WeaponDefinitions)
 local BallDefinition = require(replicatedGame.Shared.Balls.BallDefinitions).StandardBall
+local Effects = require(replicatedGame.Shared.Effects.ParryEffectDefinitions)
 local CombatInputController = require(script.Parent.Input.CombatInputController)
 local WeaponPresentationController = require(script.Parent.Weapons.WeaponPresentationController)
 local InventoryController = require(script.Parent.InventoryController)
@@ -44,9 +43,9 @@ local snapshotAt = 0
 local orientedRevision = -1
 local pulseRevision = 0
 
-local input = CombatInputController.new(parryIntent)
-input:Bind()
 local weapon = WeaponPresentationController.new(player, WeaponDefinitions.TrainingBlade)
+local input = CombatInputController.new(parryIntent, function(direction) weapon:PresentIntent(direction) end)
+input:Bind()
 InventoryController.Start(player, inventoryRequest, inventoryState)
 
 local function setBallReadability(ball, intensity)
@@ -125,19 +124,21 @@ combatEvent.OnClientEvent:Connect(function(event)
 		if not ball or not ball.Parent then return end
 		pulseRevision += 1
 		local pulse = pulseRevision
-		local intensity = math.clamp(event.Rally / 20, 0, 1)
+		local intensity = Effects.ImpactIntensity(event.Speed or snapshotVelocity.Magnitude, event.Rally, Config.Ball.MaxSpeed)
 		local baseSize = currentBall.Size
 		ball.Color = Color3.fromRGB(255, 245, 215)
-		ball.Size = Vector3.new(baseSize.X * 1.3, baseSize.Y * 0.82, baseSize.Z * 0.82)
+		ball.Size = Vector3.new(baseSize.X * 0.82, baseSize.Y * 0.82, baseSize.Z * (1.25 + intensity * 0.2))
+		local direction = typeof(event.Direction) == "Vector3" and event.Direction or snapshotVelocity.Unit
+		ball.CFrame = CFrame.lookAt(ball.Position, ball.Position + direction)
 		local light = ball:FindFirstChild("CoreLight")
 		if light and light:IsA("PointLight") then light.Brightness = 4 end
 		local trail = ball:FindFirstChildOfClass("Trail")
 		if trail then trail.Lifetime = Config.Feedback.ParryTrailLifetime; trail.LightEmission = 1 end
 		playSoundHook(ball, "ParrySound", intensity)
-		ParryEffectController.Present(event.Position, snapshotVelocity.Magnitude > 0 and snapshotVelocity.Unit or Vector3.zAxis, intensity)
+		ParryEffectController.Present(event.Position, direction, intensity)
 		weapon:PresentParry()
 		local camera = workspace.CurrentCamera
-		if camera then camera.CFrame *= CFrame.new(0, 0, Config.Feedback.CameraImpulse) end
+		if camera then camera.CFrame *= CFrame.new(0, 0, Config.Feedback.CameraImpulse * (0.65 + intensity * 0.35)) end
 		task.delay(Config.Feedback.ParryFlashDuration, function()
 			if pulse ~= pulseRevision or not ball.Parent then return end
 			pulseRevision = 0
@@ -148,20 +149,8 @@ combatEvent.OnClientEvent:Connect(function(event)
 		end)
 	elseif event.Kind == CombatTypes.EventKind.CombatantHit then
 		if typeof(event.Position) ~= "Vector3" then return end
-		playSoundHook(currentBall, "HitSound")
-		local flash = Instance.new("Part")
-		flash.Name = "V3BodyHitFlash"
-		flash.Shape = Enum.PartType.Ball
-		flash.Size = Vector3.one * 1.4
-		flash.Position = event.Position
-		flash.Color = Color3.fromRGB(255, 236, 210)
-		flash.Material = Enum.Material.Neon
-		flash.Anchored = true
-		flash.CanCollide = false
-		flash.CanTouch = false
-		flash.CanQuery = false
-		flash.Parent = workspace
-		TweenService:Create(flash, TweenInfo.new(Config.Feedback.HitFlashDuration * 0.8), { Size = Vector3.one * 2.4, Transparency = 1 }):Play()
-		Debris:AddItem(flash, Config.Feedback.HitFlashDuration)
+		local intensity = Effects.ImpactIntensity(snapshotVelocity.Magnitude, event.Rally or 0, Config.Ball.MaxSpeed)
+		playSoundHook(currentBall, "HitSound", intensity)
+		ParryEffectController.PresentHit(event.Position, intensity)
 	end
 end)

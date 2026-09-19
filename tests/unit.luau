@@ -9,12 +9,16 @@ local function check(value, message) assert(value, message); assertions += 1 end
 local function load(path, environment)
 	environment.Vector3 = environment.Vector3 or roblox.Vector3
 	environment.CFrame = environment.CFrame or roblox.CFrame
+	environment.Color3 = environment.Color3 or roblox.Color3
 	return luau.load(fs.readFile(path), { environment = environment, debugName = path })()
 end
 
 local config = load("src/shared/Config/CombatConfig.luau", {})
 local combatTypes = load("src/shared/Combat/CombatTypes.luau", {})
 local ballDefinitions = load("src/shared/Balls/BallDefinitions.luau", {})
+local effectDefinitions = load("src/shared/Effects/ParryEffectDefinitions.luau", {})
+check(effectDefinitions.ImpactIntensity(0, 0, config.Ball.MaxSpeed) == 0 and effectDefinitions.ImpactIntensity(config.Ball.MaxSpeed * 2, 100, config.Ball.MaxSpeed) == 1, "shared impact intensity remains normalized")
+check(effectDefinitions.Resolve("invalid") == effectDefinitions.DefaultParryEffect, "invalid equipped effect falls back to DefaultParryEffect")
 check(ballDefinitions.StandardBall.AssetName == "CombatBall" and ballDefinitions.StandardBall.HitRadius == nil and ballDefinitions.StandardBall.GameplaySpeed == nil, "ball presentation definition cannot override authoritative geometry or speed")
 check(config.Ball.Radius > 0 and config.Parry.DefensiveRadius > config.Hurt.BodyRadius + config.Ball.Radius, "visual, hurt, and defensive geometry remain separate")
 check(config.SpeedForRally(0) < config.SpeedForRally(3) and config.SpeedForRally(1000) == config.Ball.MaxSpeed, "rally speed progresses monotonically and caps")

@@ -46,12 +46,15 @@ end
 
 function CombatCore:_redirect(actor, metrics, mode, now, aimDirection)
 	if now < (self.ReadyAt[actor.Id] or 0) then return self:_result(actor, false, "COOLDOWN", metrics, mode) end
-	if not self.Ball:Redirect(actor, validatedAim(aimDirection)) then return self:_result(actor, false, "REDIRECT_REJECTED", metrics, mode) end
+	local safeAim = validatedAim(aimDirection)
+	if not self.Ball:Redirect(actor, safeAim) then return self:_result(actor, false, "REDIRECT_REJECTED", metrics, mode) end
+	local _, redirectedVelocity = self.Ball:GetKinematics()
 	self.ReadyAt[actor.Id] = now + Config.Parry.Cooldown
 	self.Pending[actor.Id] = nil
 	self.Event:FireAllClients(CombatTypes.Event(CombatTypes.EventKind.ParryConfirmed, {
 		ActorId = actor.Id, Position = metrics.Position,
 		Rally = self.Ball:GetRally(), Mode = mode,
+		Direction = redirectedVelocity.Unit, Speed = redirectedVelocity.Magnitude,
 	}))
 	return self:_result(actor, true, "PARRIED", metrics, mode)
 end

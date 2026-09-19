@@ -7,7 +7,7 @@ function Schema.New()
 		Stats = { Wins = 0 },
 		Currency = { Coins = 0, Gems = 0 },
 		Inventory = { Weapons = { TrainingBlade = true }, Balls = {}, Effects = {}, Animations = {} },
-		Equipped = { Weapon = "TrainingBlade", Ball = "StandardBall" },
+		Equipped = { Weapon = "TrainingBlade", Ball = "StandardBall", ParryEffect = "DefaultParryEffect" },
 	}
 end
 
