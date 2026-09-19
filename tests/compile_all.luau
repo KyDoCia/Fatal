@@ -7,6 +7,7 @@ local files = {
 	"src/shared/Weapons/WeaponDefinitions.luau",
 	"src/shared/Balls/BallDefinitions.luau",
 	"src/shared/Profile/ProfileSchema.luau",
+	"src/shared/Effects/ParryEffectDefinitions.luau",
 	"src/shared/Util/CharacterUtil.luau",
 	"src/shared/Util/TrajectoryMath.luau",
 	"src/server/CombatantRegistry.luau",
@@ -22,6 +23,7 @@ local files = {
 	"src/client/Input/CombatInputController.luau",
 	"src/client/Weapons/WeaponPresentationController.luau",
 	"src/client/InventoryController.luau",
+	"src/client/ParryEffectController.luau",
 }
 
 for _, path in files do

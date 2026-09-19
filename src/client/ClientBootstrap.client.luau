@@ -14,6 +14,7 @@ local BallDefinition = require(replicatedGame.Shared.Balls.BallDefinitions).Stan
 local CombatInputController = require(script.Parent.Input.CombatInputController)
 local WeaponPresentationController = require(script.Parent.Weapons.WeaponPresentationController)
 local InventoryController = require(script.Parent.InventoryController)
+local ParryEffectController = require(script.Parent.ParryEffectController)
 local remotes = replicatedGame:WaitForChild("Remotes")
 local parryIntent = remotes:WaitForChild("ParryIntent")
 local snapshot = remotes:WaitForChild("BallSnapshot")
@@ -57,9 +58,9 @@ local function setBallReadability(ball, intensity)
 	if trail then trail.LightEmission = 0.8 + intensity * 0.2 end
 end
 
-local function playSoundHook(ball, name)
+local function playSoundHook(ball, name, intensity)
 	local sound = ball and ball:FindFirstChild(name)
-	if sound and sound:IsA("Sound") and sound.SoundId ~= "" then sound:Play() end
+	if sound and sound:IsA("Sound") and sound.SoundId ~= "" then sound.PlaybackSpeed = 0.95 + (intensity or 0) * 0.2; sound:Play() end
 end
 
 snapshot.OnClientEvent:Connect(function(state)
@@ -124,12 +125,16 @@ combatEvent.OnClientEvent:Connect(function(event)
 		if not ball or not ball.Parent then return end
 		pulseRevision += 1
 		local pulse = pulseRevision
+		local intensity = math.clamp(event.Rally / 20, 0, 1)
+		local baseSize = currentBall.Size
 		ball.Color = Color3.fromRGB(255, 245, 215)
+		ball.Size = Vector3.new(baseSize.X * 1.3, baseSize.Y * 0.82, baseSize.Z * 0.82)
 		local light = ball:FindFirstChild("CoreLight")
 		if light and light:IsA("PointLight") then light.Brightness = 4 end
 		local trail = ball:FindFirstChildOfClass("Trail")
 		if trail then trail.Lifetime = Config.Feedback.ParryTrailLifetime; trail.LightEmission = 1 end
-		playSoundHook(ball, "ParrySound")
+		playSoundHook(ball, "ParrySound", intensity)
+		ParryEffectController.Present(event.Position, snapshotVelocity.Magnitude > 0 and snapshotVelocity.Unit or Vector3.zAxis, intensity)
 		weapon:PresentParry()
 		local camera = workspace.CurrentCamera
 		if camera then camera.CFrame *= CFrame.new(0, 0, Config.Feedback.CameraImpulse) end
@@ -137,6 +142,7 @@ combatEvent.OnClientEvent:Connect(function(event)
 			if pulse ~= pulseRevision or not ball.Parent then return end
 			pulseRevision = 0
 			ball.Color = baseColor
+			ball.Size = baseSize
 			if light and light.Parent then light.Brightness = 0.8 end
 			if trail and trail.Parent then trail.Lifetime = 0.1; trail.LightEmission = 0.8 end
 		end)

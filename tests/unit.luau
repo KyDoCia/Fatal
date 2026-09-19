@@ -15,6 +15,7 @@ end
 local config = load("src/shared/Config/CombatConfig.luau", {})
 local combatTypes = load("src/shared/Combat/CombatTypes.luau", {})
 local ballDefinitions = load("src/shared/Balls/BallDefinitions.luau", {})
+check(ballDefinitions.StandardBall.AssetName == "CombatBall" and ballDefinitions.StandardBall.HitRadius == nil and ballDefinitions.StandardBall.GameplaySpeed == nil, "ball presentation definition cannot override authoritative geometry or speed")
 check(config.Ball.Radius > 0 and config.Parry.DefensiveRadius > config.Hurt.BodyRadius + config.Ball.Radius, "visual, hurt, and defensive geometry remain separate")
 check(config.SpeedForRally(0) < config.SpeedForRally(3) and config.SpeedForRally(1000) == config.Ball.MaxSpeed, "rally speed progresses monotonically and caps")
 local separation = 40
@@ -194,6 +195,8 @@ local ballCore = BallCore.new(ballRegistry, remote, remote, gameplay)
 ballCore:Start(first)
 check(#ballCore:_ownedBalls() == 1, "exactly one authoritative V2 ball spawns")
 check((ballCore.Part.Size - roblox.Vector3.one * config.Ball.Radius * 2).Magnitude < 1e-4, "spawned ball visual matches authoritative diameter")
+local directOpening = (first.CenterPart.Position - ballCore.Position).Unit
+check(ballCore.Velocity.Unit:Dot(directOpening) < 0.999, "authoritative launch begins with a deterministic readable curve")
 local launchDistance = (ballCore.Position - first.CenterPart.Position).Magnitude
 local actualSeparation = (first.CenterPart.Position - second.CenterPart.Position).Magnitude
 check(math.abs(launchDistance - (actualSeparation - config.Ball.LaunchOffset)) < 1e-4 and math.abs((launchDistance - config.Parry.DefensiveRadius) / ballCore.Velocity.Magnitude - config.FirstApproachSeconds(actualSeparation)) < 1e-4, "actual first launch matches geometry-derived approach timing")

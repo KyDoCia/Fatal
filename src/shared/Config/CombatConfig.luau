@@ -7,6 +7,7 @@ local Config = {
 		MaxSpeed = 140,
 		SpeedPerRally = 4,
 		HomingRate = 2.4,
+		CurveDeflection = 0.32,
 		MaxDeltaTime = 0.1,
 		MaxTravelPerStep = 1.5,
 		SnapshotInterval = 1 / 20,

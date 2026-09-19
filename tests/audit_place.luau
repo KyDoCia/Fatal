@@ -8,6 +8,7 @@ local expectedScripts = {
 	["ReplicatedStorage.Game.Shared.Weapons.WeaponDefinitions"] = "ModuleScript",
 	["ReplicatedStorage.Game.Shared.Balls.BallDefinitions"] = "ModuleScript",
 	["ReplicatedStorage.Game.Shared.Profile.ProfileSchema"] = "ModuleScript",
+	["ReplicatedStorage.Game.Shared.Effects.ParryEffectDefinitions"] = "ModuleScript",
 	["ReplicatedStorage.Game.Shared.Util.CharacterUtil"] = "ModuleScript",
 	["ReplicatedStorage.Game.Shared.Util.TrajectoryMath"] = "ModuleScript",
 	["ServerScriptService.Game.GameServer"] = "Script",
@@ -23,6 +24,7 @@ local expectedScripts = {
 	["StarterPlayer.StarterPlayerScripts.Game.Input.CombatInputController"] = "ModuleScript",
 	["StarterPlayer.StarterPlayerScripts.Game.Weapons.WeaponPresentationController"] = "ModuleScript",
 	["StarterPlayer.StarterPlayerScripts.Game.InventoryController"] = "ModuleScript",
+	["StarterPlayer.StarterPlayerScripts.Game.ParryEffectController"] = "ModuleScript",
 }
 
 local function resolve(path)
@@ -46,7 +48,7 @@ for _, serviceName in { "ReplicatedStorage", "ServerScriptService", "StarterPlay
 		end
 	end
 end
-assert(scriptCount == 20, "expected exactly 20 canonical quality-pass scripts")
+assert(scriptCount == 22, "expected exactly 22 canonical game-feel scripts")
 
 local replicated = place:GetService("ReplicatedStorage").Game
 for _, name in { "ParryIntent", "BallSnapshot", "CombatEvent", "InventoryRequest", "InventoryState" } do assert(replicated.Remotes[name]:IsA("RemoteEvent"), "missing remote " .. name) end
@@ -107,4 +109,4 @@ local savedBalls = 0
 for _, value in place:GetService("Workspace"):GetDescendants() do if value:GetAttribute("FatalV2Ball") then savedBalls += 1 end end
 assert(savedBalls == 0, "saved place contains an authoritative gameplay ball")
 
-print("PASS: quality-pass place has 20 scripts, canonical inventory, smooth ball presentation, and no legacy UI")
+print("PASS: game-feel place has 22 scripts, pooled parry effects, smooth ball presentation, and no legacy UI")
