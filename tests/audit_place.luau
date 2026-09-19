@@ -4,6 +4,8 @@ local place = roblox.deserializePlace(fs.readFile("Fatal.rbxlx"))
 
 local expectedScripts = {
 	["ReplicatedStorage.Game.Shared.Config.CombatConfig"] = "ModuleScript",
+	["ReplicatedStorage.Game.Shared.Combat.CombatTypes"] = "ModuleScript",
+	["ReplicatedStorage.Game.Shared.Weapons.WeaponDefinitions"] = "ModuleScript",
 	["ReplicatedStorage.Game.Shared.Util.CharacterUtil"] = "ModuleScript",
 	["ReplicatedStorage.Game.Shared.Util.TrajectoryMath"] = "ModuleScript",
 	["ServerScriptService.Game.GameServer"] = "Script",
@@ -13,6 +15,8 @@ local expectedScripts = {
 	["ServerScriptService.Game.TrainingOpponent"] = "ModuleScript",
 	["ServerScriptService.Game.DuelService"] = "ModuleScript",
 	["StarterPlayer.StarterPlayerScripts.Game.ClientBootstrap"] = "LocalScript",
+	["StarterPlayer.StarterPlayerScripts.Game.Input.CombatInputController"] = "ModuleScript",
+	["StarterPlayer.StarterPlayerScripts.Game.Weapons.WeaponPresentationController"] = "ModuleScript",
 }
 
 local function resolve(path)
@@ -36,16 +40,18 @@ for _, serviceName in { "ReplicatedStorage", "ServerScriptService", "StarterPlay
 		end
 	end
 end
-assert(scriptCount == 10, "expected exactly 10 canonical V2 scripts")
+assert(scriptCount == 14, "expected exactly 14 canonical combat foundation scripts")
 
 local replicated = place:GetService("ReplicatedStorage").Game
 for _, name in { "ParryIntent", "BallSnapshot", "CombatEvent" } do assert(replicated.Remotes[name]:IsA("RemoteEvent"), "missing remote " .. name) end
-assert(#replicated.Assets:GetChildren() == 1, "V2 assets must contain only the gameplay ball source")
+assert(#replicated.Assets:GetChildren() == 2, "foundation assets must contain one ball and one presentation weapon")
 local ball = replicated.Assets.CombatBall
 assert(ball:IsA("BasePart") and (ball.Size - roblox.Vector3.one * 2).Magnitude < 1e-4, "built ball must be 2 studs on every axis")
 assert(ball:FindFirstChildOfClass("Trail"), "built ball must preserve the readable motion trail")
 assert(ball:FindFirstChild("CoreLight") and ball.CoreLight:IsA("PointLight"), "built ball must expose the parry flash light")
 assert(ball:FindFirstChild("ParrySound") and ball.ParrySound:IsA("Sound") and ball:FindFirstChild("HitSound") and ball.HitSound:IsA("Sound"), "built ball must expose empty sound hooks")
+local weapon = replicated.Assets.TrainingBlade
+assert(weapon:IsA("BasePart") and not weapon.CanCollide and not weapon.CanTouch and not weapon.CanQuery, "placeholder weapon must be presentation-only")
 
 local starterGui = place:GetService("StarterGui")
 local guiChildren = starterGui:GetChildren()
@@ -92,4 +98,4 @@ local savedBalls = 0
 for _, value in place:GetService("Workspace"):GetDescendants() do if value:GetAttribute("FatalV2Ball") then savedBalls += 1 end end
 assert(savedBalls == 0, "saved place contains an authoritative gameplay ball")
 
-print("PASS: clean-room place has 10 scripts, RallyGui only, 2-stud readable ball, no legacy presentation")
+print("PASS: clean foundation place has 14 scripts, one presentation weapon, readable ball, and no legacy UI")

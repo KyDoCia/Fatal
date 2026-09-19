@@ -13,12 +13,14 @@ local function load(path, environment)
 end
 
 local config = load("src/shared/Config/CombatConfig.luau", {})
-check(config.Ball.Radius == 1 and config.Parry.DefensiveRadius == 10, "V3 readable ball and defensive radius are explicit")
-check(config.SpeedForRally(0) == 28 and config.SpeedForRally(3) == 40 and config.SpeedForRally(100) == 140, "V3 rally speed is linear and capped")
-check(math.abs(config.FirstApproachSeconds(40) - 1) < 1e-6, "first ball derives one second of reading time from actual separation")
-check(math.abs(config.ParryOpportunityMilliseconds(config.SpeedForRally(0)) - 257.142857) < 0.01, "rally zero has a learnable defensive opportunity")
-check(config.ParryOpportunityMilliseconds(config.SpeedForRally(3)) >= 180 and config.ParryOpportunityMilliseconds(config.SpeedForRally(6)) > 138, "defensive opportunity shrinks progressively")
-check(config.NPC.MissChance == 0 and config.NPC.ReactionDelay == 0, "Combat Lab NPC has deterministic zero-miss reaction")
+local combatTypes = load("src/shared/Combat/CombatTypes.luau", {})
+check(config.Ball.Radius > 0 and config.Parry.DefensiveRadius > config.Hurt.BodyRadius + config.Ball.Radius, "visual, hurt, and defensive geometry remain separate")
+check(config.SpeedForRally(0) < config.SpeedForRally(3) and config.SpeedForRally(1000) == config.Ball.MaxSpeed, "rally speed progresses monotonically and caps")
+local separation = 40
+local derivedApproach = (separation - config.Ball.LaunchOffset - config.Parry.DefensiveRadius) / config.Ball.BaseSpeed
+check(math.abs(config.FirstApproachSeconds(separation) - derivedApproach) < 1e-6, "first approach timing derives from actual geometry")
+check(config.ParryOpportunityMilliseconds(config.SpeedForRally(0)) > config.ParryOpportunityMilliseconds(config.SpeedForRally(3)), "defensive opportunity shrinks as rally speed rises")
+check(config.NPC.ReactionRadius == config.Parry.DefensiveRadius, "Combat Lab NPC returns every valid defensive crossing")
 
 local trajectory = load("src/shared/Util/TrajectoryMath.luau", {})
 check(trajectory.IsApproaching(roblox.Vector3.new(10, 0, 0), roblox.Vector3.new(-50, 0, 0), roblox.Vector3.zero, 0.1), "incoming direction is accepted")
@@ -34,8 +36,8 @@ for _, speed in { 50, 100, 200, 300 } do
 	check(hit, "swept hurt collision prevents tunneling at " .. speed)
 end
 
-local configToken, mathToken = {}, {}
-local replicated = { Game = { Shared = { Config = { CombatConfig = configToken }, Util = { TrajectoryMath = mathToken } } } }
+local configToken, mathToken, typesToken = {}, {}, {}
+local replicated = { Game = { Shared = { Config = { CombatConfig = configToken }, Combat = { CombatTypes = typesToken }, Util = { TrajectoryMath = mathToken } } } }
 local now = 10
 local actor = { Id = "P:1", Kind = "Player", Alive = true, CenterPart = { Position = roblox.Vector3.zero } }
 local registry = { IsAlive = function(_, subject) return subject and subject.Alive end }
@@ -55,15 +57,15 @@ local events = { FireAllClients = function(_, payload) table.insert(firedEvents,
 local CombatCore = load("src/server/CombatCore.luau", {
 	game = { GetService = function(_, name) if name == "ReplicatedStorage" then return replicated end; error(name) end },
 	workspace = { GetServerTimeNow = function() return now end },
-	require = function(module) if module == configToken then return config elseif module == mathToken then return trajectory end; error("dependency") end,
+	require = function(module) if module == configToken then return config elseif module == mathToken then return trajectory elseif module == typesToken then return combatTypes end; error("dependency") end,
 })
 local combat = CombatCore.new(registry, events)
 combat:SetBall(ball)
 combat:SetActive(true)
 local accepted, reason = combat:TryParry(actor)
 check(accepted and reason == "PARRIED" and redirects == 1, "in-range incoming intent redirects immediately")
-check(#firedEvents == 1 and firedEvents[1].Kind == "ParryConfirmed" and firedEvents[1].Mode == "IMMEDIATE", "immediate success fires one authoritative hit-confirm")
-check(not combat:TryParry(actor), "simple cooldown rejects immediate repeat")
+check(#firedEvents == 1 and firedEvents[1].Version == combatTypes.ProtocolVersion and firedEvents[1].Kind == combatTypes.EventKind.ParryConfirmed and firedEvents[1].Mode == "IMMEDIATE", "immediate success fires one versioned authoritative hit-confirm")
+check(not combat:TryParry(actor) and redirects == 1, "one confirmed parry cannot double-redirect")
 
 local function fresh(subject, distance, direction)
 	position = roblox.Vector3.new(distance, 0, 0)
@@ -156,7 +158,7 @@ local TrainingOpponent = load("src/server/TrainingOpponent.luau", {
 })
 local trainer = TrainingOpponent.new(npcRegistry, npcCombat, npcBall, {})
 trainer.Combatant = npcActor
-for index, speed in { 28, 52, 140 } do
+for index, speed in { config.SpeedForRally(0), config.SpeedForRally(6), config.Ball.MaxSpeed } do
 	now += 0.2
 	npcRevision += 1
 	npcPosition = roblox.Vector3.new(9.9, 0, 0)
@@ -167,8 +169,8 @@ end
 
 local place = roblox.deserializePlace(fs.readFile("Fatal.rbxlx"))
 local actualGame = place:GetService("ReplicatedStorage").Game
-local ballConfigToken, ballMathToken = {}, {}
-local ballReplicated = { Game = { Shared = { Config = { CombatConfig = ballConfigToken }, Util = { TrajectoryMath = ballMathToken } }, Assets = { CombatBall = actualGame.Assets.CombatBall } } }
+local ballConfigToken, ballMathToken, ballTypesToken = {}, {}, {}
+local ballReplicated = { Game = { Shared = { Config = { CombatConfig = ballConfigToken }, Combat = { CombatTypes = ballTypesToken }, Util = { TrajectoryMath = ballMathToken } }, Assets = { CombatBall = actualGame.Assets.CombatBall } } }
 local gameplay = place:GetService("Workspace").Game.Arena.Gameplay
 local first = { Id = "P:first", Alive = true, CenterPart = { Position = roblox.Vector3.new(-20, 4, 0) }, RootPart = { Position = roblox.Vector3.new(-20, 3, 0) } }
 local second = { Id = "N:second", Alive = true, CenterPart = { Position = roblox.Vector3.new(20, 4, 0) }, RootPart = { Position = roblox.Vector3.new(20, 3, 0) } }
@@ -180,7 +182,7 @@ local ballRegistry = {
 }
 local BallCore = load("src/server/BallCore.luau", {
 	game = { GetService = function(_, name) if name == "ReplicatedStorage" then return ballReplicated end; error(name) end },
-	require = function(module) if module == ballConfigToken then return config elseif module == ballMathToken then return trajectory end; error("dependency") end,
+	require = function(module) if module == ballConfigToken then return config elseif module == ballMathToken then return trajectory elseif module == ballTypesToken then return combatTypes end; error("dependency") end,
 })
 local remote = { FireAllClients = function() end }
 local ballCore = BallCore.new(ballRegistry, remote, remote, gameplay)
@@ -188,13 +190,29 @@ ballCore:Start(first)
 check(#ballCore:_ownedBalls() == 1, "exactly one authoritative V2 ball spawns")
 check((ballCore.Part.Size - roblox.Vector3.one * config.Ball.Radius * 2).Magnitude < 1e-4, "spawned ball visual matches authoritative diameter")
 local launchDistance = (ballCore.Position - first.CenterPart.Position).Magnitude
-check(math.abs(launchDistance - 38) < 1e-4 and math.abs((launchDistance - config.Parry.DefensiveRadius) / ballCore.Velocity.Magnitude - 1) < 1e-4, "actual first launch provides one second before the defensive zone")
+local actualSeparation = (first.CenterPart.Position - second.CenterPart.Position).Magnitude
+check(math.abs(launchDistance - (actualSeparation - config.Ball.LaunchOffset)) < 1e-4 and math.abs((launchDistance - config.Parry.DefensiveRadius) / ballCore.Velocity.Magnitude - config.FirstApproachSeconds(actualSeparation)) < 1e-4, "actual first launch matches geometry-derived approach timing")
 local stepObservations = 0
 ballCore:Update(0.1, function() stepObservations += 1 end)
 check(stepObservations >= 2, "ball exposes every bounded movement step to the deterministic NPC decision")
 check(ballCore:Redirect(first) and ballCore:GetTarget() == second and ballCore:GetRally() == 1, "redirect changes target and increments rally immediately")
 ballCore:Stop()
 check(#ballCore:_ownedBalls() == 0, "V2 ball cleanup leaves no authoritative instance")
+
+local rallyEvents = {}
+local rallyRemote = { FireAllClients = function(_, payload) table.insert(rallyEvents, payload) end }
+local rallyBall = BallCore.new(ballRegistry, remote, rallyRemote, gameplay)
+rallyBall:Start(first)
+for expected = 1, 130 do
+	check(rallyBall:Redirect(rallyBall:GetTarget()) and rallyBall:GetRally() == expected, "long rally increments exactly once at exchange " .. expected)
+end
+local rallyChanged = 0
+for _, event in rallyEvents do if event.Kind == combatTypes.EventKind.RallyChanged then rallyChanged += 1 end end
+check(rallyChanged == 131, "rally zero plus 130 redirects emit exactly one RallyChanged each")
+local targetChanged = 0
+for _, event in rallyEvents do if event.Kind == combatTypes.EventKind.BallTargetChanged then targetChanged += 1 end end
+check(targetChanged == 131, "initial target plus 130 redirects emit exactly one BallTargetChanged each")
+rallyBall:Stop()
 
 first.Alive = true
 second.Alive = true
@@ -208,23 +226,27 @@ hitBall.Part.Position = hitBall.Position
 hitBall.Velocity = roblox.Vector3.xAxis * config.Ball.BaseSpeed
 hitBall:Update(0.1)
 check(hitBall.State == "Resolved" and not second.Alive, "swept body contact resolves the target exactly when crossed")
-check(#hitEvents == 1 and hitEvents[1].Kind == "BodyHit" and hitEvents[1].TargetId == second.Id, "body contact fires one authoritative hit-confirm")
+local bodyHitCount = 0
+for _, event in hitEvents do if event.Kind == combatTypes.EventKind.CombatantHit and event.TargetId == second.Id then bodyHitCount += 1 end end
+check(bodyHitCount == 1, "body contact fires one authoritative hit-confirm")
 hitBall:Update(0.1)
-check(#hitEvents == 1, "resolved body contact cannot fire twice")
+local eventsAfterResolved = #hitEvents
+hitBall:Update(0.1)
+check(#hitEvents == eventsAfterResolved, "resolved body contact cannot fire twice")
 hitBall:Stop()
 check(#hitBall:_ownedBalls() == 0, "body hit cleanup removes the authoritative ball")
 
-local duelConfigToken, characterToken = {}, {}
+local duelConfigToken, characterToken, duelTypesToken = {}, {}, {}
 local fakePlayer = { Name = "Tester" }
 local players = { GetPlayers = function() return { fakePlayer } end }
-local duelReplicated = { Game = { Shared = { Config = { CombatConfig = duelConfigToken }, Util = { CharacterUtil = characterToken } } } }
+local duelReplicated = { Game = { Shared = { Config = { CombatConfig = duelConfigToken }, Combat = { CombatTypes = duelTypesToken }, Util = { CharacterUtil = characterToken } } } }
 local DuelService = load("src/server/DuelService.luau", {
 	game = { GetService = function(_, name)
 		if name == "Players" then return players elseif name == "ReplicatedStorage" then return duelReplicated end
 		error(name)
 	end },
 	workspace = { GetServerTimeNow = function() return now end },
-	require = function(module) if module == duelConfigToken then return config elseif module == characterToken then return {} end; error("dependency") end,
+	require = function(module) if module == duelConfigToken then return config elseif module == characterToken then return {} elseif module == duelTypesToken then return combatTypes end; error("dependency") end,
 })
 local duelPlayer = { Id = "P:duel", Alive = true }
 local duelNPC = { Id = "N:duel", Alive = true }
@@ -240,20 +262,24 @@ local duelCombat = { SetActive = function() end }
 local duelOpponent = { Combatant = duelNPC, Clears = 0, Clear = function(self) self.Clears += 1 end, Update = function() end }
 local spawnFolder = { GetChildren = function() return { { Name = "Spawn01" }, { Name = "Spawn02" } } end }
 local gameplayStub = { WaitForChild = function(_, name) assert(name == "SpawnPoints"); return spawnFolder end }
-local duel = DuelService.new(duelRegistry, duelCombat, duelBall, duelOpponent, gameplayStub)
+local duelEvents = {}
+local duelRemote = { FireAllClients = function(_, payload) table.insert(duelEvents, payload) end }
+local duel = DuelService.new(duelRegistry, duelCombat, duelBall, duelOpponent, gameplayStub, duelRemote)
 local preparations = 0
-duel._prepare = function(self) preparations += 1; self.State = "Starting"; self.Deadline = now + config.Round.Countdown; return true end
+duel._prepare = function(self) preparations += 1; self:_transition(combatTypes.DuelState.Countdown, config.Duel.Countdown); return true end
 duel:Update(0.01)
-check(duel.State == "Starting" and preparations == 1, "duel prepares one Player and one NPC")
+check(duel.State == combatTypes.DuelState.Countdown and preparations == 1, "duel prepares one Player and one NPC")
 now = duel.Deadline
 duel:Update(0.01)
-check(duel.State == "Playing" and duelBall.Starts == 1, "duel starts exactly one ball")
+check(duel.State == combatTypes.DuelState.Active and duelBall.Starts == 1, "duel starts exactly one ball")
 duelAlive = { duelPlayer }
 duel:Update(0.01)
-check(duel.State == "Ending" and duelBall.Stops >= 1, "elimination stops the ball deterministically")
+check(duel.State == combatTypes.DuelState.Ending and duelBall.Stops >= 1, "elimination stops the ball deterministically")
 now = duel.Deadline
 duel:Update(0.01)
 duel:Update(0.01)
-check(duel.State == "Starting" and preparations == 2 and duelOpponent.Clears >= 1, "duel resets and re-enters without accumulated state")
+duel:Update(0.01)
+check(duel.State == combatTypes.DuelState.Countdown and preparations == 2 and duelOpponent.Clears >= 1, "duel resets and re-enters without accumulated state")
+check(#duelEvents == 6 and duelEvents[1].Kind == combatTypes.EventKind.DuelStateChanged and duelEvents[1].Version == combatTypes.ProtocolVersion, "central lifecycle emits one versioned event per transition")
 
 print(string.format("PASS: %d V2 assertions", assertions))

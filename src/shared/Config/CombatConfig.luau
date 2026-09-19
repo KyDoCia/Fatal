@@ -1,5 +1,5 @@
 local Config = {
-	CombatDebug = false,
+	Telemetry = { Enabled = false },
 	Ball = {
 		Radius = 1,
 		LaunchOffset = 2,
@@ -23,10 +23,15 @@ local Config = {
 	},
 	NPC = {
 		ReactionRadius = 10,
-		ReactionDelay = 0,
-		MissChance = 0,
 	},
-	Round = {
+	Feedback = {
+		CueStartMultiplier = 1.6,
+		ParryFlashDuration = 0.11,
+		ParryTrailLifetime = 0.22,
+		HitFlashDuration = 0.15,
+		CameraImpulse = 0.18,
+	},
+	Duel = {
 		Countdown = 0.5,
 		Ending = 1.2,
 		CharacterTimeout = 8,

@@ -89,6 +89,18 @@ for _, name in { "ParrySound", "HitSound" } do
 end
 fs.writeFile("assets/CombatBall.rbxm", roblox.serializeModel({ ball }))
 
+local blade = Instance.new("Part")
+blade.Name = "TrainingBlade"
+blade.Size = Vector3.new(0.22, 3.4, 0.42)
+blade.Color = Color3.fromRGB(205, 215, 230)
+blade.Material = Enum.Material.Metal
+blade.Anchored = false
+blade.CanCollide = false
+blade.CanTouch = false
+blade.CanQuery = false
+blade.Massless = true
+fs.writeFile("assets/TrainingBlade.rbxm", roblox.serializeModel({ blade }))
+
 local gui = Instance.new("ScreenGui")
 gui.Name = "RallyGui"
 gui.ResetOnSpawn = false

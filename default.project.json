@@ -18,7 +18,8 @@
         "Assets": {
           "$className": "Folder",
           "$ignoreUnknownInstances": false,
-          "CombatBall": { "$path": "assets/CombatBall.rbxm" }
+          "CombatBall": { "$path": "assets/CombatBall.rbxm" },
+          "TrainingBlade": { "$path": "assets/TrainingBlade.rbxm" }
         }
       }
     },
@@ -42,7 +43,9 @@
         "Game": {
           "$className": "Folder",
           "$ignoreUnknownInstances": false,
-          "ClientBootstrap": { "$path": "src/client/ClientBootstrap.client.luau" }
+          "ClientBootstrap": { "$path": "src/client/ClientBootstrap.client.luau" },
+          "Input": { "$path": "src/client/Input" },
+          "Weapons": { "$path": "src/client/Weapons" }
         }
       }
     },

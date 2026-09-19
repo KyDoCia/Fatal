@@ -1,5 +1,4 @@
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -7,6 +6,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 local replicatedGame = ReplicatedStorage:WaitForChild("Game")
 local Config = require(replicatedGame:WaitForChild("Shared"):WaitForChild("Config"):WaitForChild("CombatConfig"))
+local CombatTypes = require(replicatedGame.Shared.Combat.CombatTypes)
+local WeaponDefinitions = require(replicatedGame.Shared.Weapons.WeaponDefinitions)
+local CombatInputController = require(script.Parent.Input.CombatInputController)
+local WeaponPresentationController = require(script.Parent.Weapons.WeaponPresentationController)
 local remotes = replicatedGame:WaitForChild("Remotes")
 local parryIntent = remotes:WaitForChild("ParryIntent")
 local snapshot = remotes:WaitForChild("BallSnapshot")
@@ -17,9 +20,9 @@ local currentBall = nil
 local orientedRevision = -1
 local pulseRevision = 0
 
-local function parry()
-	parryIntent:FireServer()
-end
+local input = CombatInputController.new(parryIntent)
+input:Bind()
+local weapon = WeaponPresentationController.new(player, WeaponDefinitions.TrainingBlade)
 
 local function setBallReadability(ball, intensity)
 	if not ball or not ball.Parent then return end
@@ -35,15 +38,9 @@ local function playSoundHook(ball, name)
 	if sound and sound:IsA("Sound") and sound.SoundId ~= "" then sound:Play() end
 end
 
-UserInputService.InputBegan:Connect(function(input, processed)
-	if processed then return end
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.KeyCode == Enum.KeyCode.F then parry() end
-end)
-
 snapshot.OnClientEvent:Connect(function(state)
 	if type(state) ~= "table" or type(state.Rally) ~= "number" then return end
 	currentBall = if typeof(state.Ball) == "Instance" and state.Ball:IsA("BasePart") then state.Ball else nil
-	rallyLabel.Text = if state.Rally > 0 then string.format("RALLY  %d", state.Rally) else ""
 	if currentBall and pulseRevision == 0 then
 		local character = player.Character
 		local center = character and character:FindFirstChild("UpperTorso")
@@ -51,7 +48,7 @@ snapshot.OnClientEvent:Connect(function(state)
 		local intensity = 0
 		if localTarget and center and center:IsA("BasePart") then
 			local distance = (center.Position - state.Position).Magnitude
-			local cueStart = Config.Parry.DefensiveRadius * 1.6
+			local cueStart = Config.Parry.DefensiveRadius * Config.Feedback.CueStartMultiplier
 			intensity = math.clamp((cueStart - distance) / (cueStart - Config.Parry.DefensiveRadius), 0, 1)
 		end
 		setBallReadability(currentBall, intensity)
@@ -69,8 +66,12 @@ snapshot.OnClientEvent:Connect(function(state)
 end)
 
 combatEvent.OnClientEvent:Connect(function(event)
-	if type(event) ~= "table" or type(event.Kind) ~= "string" or typeof(event.Position) ~= "Vector3" then return end
-	if event.Kind == "ParryConfirmed" then
+	if type(event) ~= "table" or type(event.Kind) ~= "string" or event.Version ~= CombatTypes.ProtocolVersion then return end
+	if event.Kind == CombatTypes.EventKind.RallyChanged then
+		if type(event.Rally) ~= "number" then return end
+		rallyLabel.Text = if event.Rally > 0 then string.format("RALLY  %d", event.Rally) else ""
+	elseif event.Kind == CombatTypes.EventKind.ParryConfirmed then
+		if typeof(event.Position) ~= "Vector3" then return end
 		local ball = currentBall
 		if not ball or not ball.Parent then return end
 		pulseRevision += 1
@@ -79,16 +80,20 @@ combatEvent.OnClientEvent:Connect(function(event)
 		local light = ball:FindFirstChild("CoreLight")
 		if light and light:IsA("PointLight") then light.Brightness = 4 end
 		local trail = ball:FindFirstChildOfClass("Trail")
-		if trail then trail.Lifetime = 0.22; trail.LightEmission = 1 end
+		if trail then trail.Lifetime = Config.Feedback.ParryTrailLifetime; trail.LightEmission = 1 end
 		playSoundHook(ball, "ParrySound")
-		task.delay(0.11, function()
+		weapon:PresentParry()
+		local camera = workspace.CurrentCamera
+		if camera then camera.CFrame *= CFrame.new(0, 0, Config.Feedback.CameraImpulse) end
+		task.delay(Config.Feedback.ParryFlashDuration, function()
 			if pulse ~= pulseRevision or not ball.Parent then return end
 			pulseRevision = 0
 			ball.Color = baseColor
 			if light and light.Parent then light.Brightness = 0.8 end
 			if trail and trail.Parent then trail.Lifetime = 0.1; trail.LightEmission = 0.8 end
 		end)
-	elseif event.Kind == "BodyHit" then
+	elseif event.Kind == CombatTypes.EventKind.CombatantHit then
+		if typeof(event.Position) ~= "Vector3" then return end
 		playSoundHook(currentBall, "HitSound")
 		local flash = Instance.new("Part")
 		flash.Name = "V3BodyHitFlash"
@@ -102,7 +107,7 @@ combatEvent.OnClientEvent:Connect(function(event)
 		flash.CanTouch = false
 		flash.CanQuery = false
 		flash.Parent = workspace
-		TweenService:Create(flash, TweenInfo.new(0.12), { Size = Vector3.one * 2.4, Transparency = 1 }):Play()
-		Debris:AddItem(flash, 0.15)
+		TweenService:Create(flash, TweenInfo.new(Config.Feedback.HitFlashDuration * 0.8), { Size = Vector3.one * 2.4, Transparency = 1 }):Play()
+		Debris:AddItem(flash, Config.Feedback.HitFlashDuration)
 	end
 end)

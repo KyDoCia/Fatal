@@ -23,7 +23,7 @@ local combat = CombatCore.new(registry, combatEvent)
 local ball = BallCore.new(registry, snapshot, combatEvent, gameplay)
 combat:SetBall(ball)
 local opponent = TrainingOpponent.new(registry, combat, ball, npcContainer)
-local duel = DuelService.new(registry, combat, ball, opponent, gameplay)
+local duel = DuelService.new(registry, combat, ball, opponent, gameplay, combatEvent)
 
 local playerConnections = {}
 local function addPlayer(player)

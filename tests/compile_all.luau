@@ -3,6 +3,8 @@ local luau = require("@lune/luau")
 
 local files = {
 	"src/shared/Config/CombatConfig.luau",
+	"src/shared/Combat/CombatTypes.luau",
+	"src/shared/Weapons/WeaponDefinitions.luau",
 	"src/shared/Util/CharacterUtil.luau",
 	"src/shared/Util/TrajectoryMath.luau",
 	"src/server/CombatantRegistry.luau",
@@ -12,6 +14,8 @@ local files = {
 	"src/server/DuelService.luau",
 	"src/server/GameServer.server.luau",
 	"src/client/ClientBootstrap.client.luau",
+	"src/client/Input/CombatInputController.luau",
+	"src/client/Weapons/WeaponPresentationController.luau",
 }
 
 for _, path in files do

@@ -23,7 +23,7 @@ function TrainingOpponent:Spawn(cframe)
 	model:SetAttribute("CombatantId", "N:TrainingOpponent")
 	model.Parent = self.Container
 	model:PivotTo(cframe)
-	assert(CharacterUtil.WaitForR15(model, Config.Round.CharacterTimeout), "TrainingOpponent incomplete R15")
+	assert(CharacterUtil.WaitForR15(model, Config.Duel.CharacterTimeout), "TrainingOpponent incomplete R15")
 	self.Model = model
 	self.Combatant = self.Registry:RegisterNPC(model)
 	self.Registry:SetAlive(self.Combatant, true)

@@ -1,5 +1,6 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Game.Shared.Config.CombatConfig)
+local CombatTypes = require(ReplicatedStorage.Game.Shared.Combat.CombatTypes)
 
 local CombatCore = {}
 CombatCore.__index = CombatCore
@@ -25,9 +26,10 @@ function CombatCore:_metrics(actor)
 end
 
 function CombatCore:_result(actor, accepted, reason, metrics, mode)
-	if Config.CombatDebug then
-		print(string.format("[V3/PARRY] actor=%s result=%s reason=%s mode=%s distance=%.2f speed=%.2f hurtMs=%s revision=%d",
-			actor and actor.Id or "none", accepted and "ACCEPT" or "REJECT", reason, mode or "INPUT",
+	if Config.Telemetry.Enabled then
+		print(string.format("[COMBAT] state=Active actor=%s rally=%d result=%s reason=%s mode=%s distance=%.2f speed=%.2f hurtMs=%s revision=%d",
+			actor and actor.Id or "none", self.Ball and self.Ball:GetRally() or -1,
+			accepted and "ACCEPT" or "REJECT", reason, mode or "INPUT",
 			metrics and metrics.Distance or -1, metrics and metrics.Speed or -1,
 			metrics and metrics.ContactMs < math.huge and string.format("%.0f", metrics.ContactMs) or "INF",
 			self.Ball and self.Ball:GetRevision() or -1))
@@ -40,10 +42,10 @@ function CombatCore:_redirect(actor, metrics, mode, now)
 	if not self.Ball:Redirect(actor) then return self:_result(actor, false, "REDIRECT_REJECTED", metrics, mode) end
 	self.ReadyAt[actor.Id] = now + Config.Parry.Cooldown
 	self.Pending[actor.Id] = nil
-	self.Event:FireAllClients({
-		Kind = "ParryConfirmed", ActorId = actor.Id, Position = metrics.Position,
+	self.Event:FireAllClients(CombatTypes.Event(CombatTypes.EventKind.ParryConfirmed, {
+		ActorId = actor.Id, Position = metrics.Position,
 		Rally = self.Ball:GetRally(), Mode = mode,
-	})
+	}))
 	return self:_result(actor, true, "PARRIED", metrics, mode)
 end
 

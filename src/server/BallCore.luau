@@ -1,6 +1,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Game.Shared.Config.CombatConfig)
 local TrajectoryMath = require(ReplicatedStorage.Game.Shared.Util.TrajectoryMath)
+local CombatTypes = require(ReplicatedStorage.Game.Shared.Combat.CombatTypes)
 
 local BallCore = {}
 BallCore.__index = BallCore
@@ -23,7 +24,7 @@ function BallCore:_assertCount(expected)
 	assert(#self:_ownedBalls() == expected, string.format("V2 ball invariant: expected %d", expected))
 end
 
-function BallCore:_other(source)
+function BallCore:SelectTargetAfter(source)
 	for _, combatant in self.Registry:GetAlive() do if combatant ~= source then return combatant end end
 	return nil
 end
@@ -33,7 +34,7 @@ function BallCore:Start(preferredTarget)
 	self:_assertCount(0)
 	local target = preferredTarget or self.Registry:GetAlive()[1]
 	assert(target, "ball requires target")
-	local source = self:_other(target)
+	local source = self:SelectTargetAfter(target)
 	if source then
 		local launchDirection = (target.CenterPart.Position - source.CenterPart.Position).Unit
 		self.Position = source.CenterPart.Position + launchDirection * Config.Ball.LaunchOffset
@@ -53,16 +54,20 @@ function BallCore:Start(preferredTarget)
 	self.Part = part
 	self.State = "Tracking"
 	self:_assertCount(1)
+	self.Event:FireAllClients(CombatTypes.Event(CombatTypes.EventKind.BallTargetChanged, { TargetId = target.Id, Revision = self.Revision }))
+	self.Event:FireAllClients(CombatTypes.Event(CombatTypes.EventKind.RallyChanged, { Rally = 0 }))
 	self:Publish()
 end
 
 function BallCore:Stop()
+	local hadTarget = self.Target ~= nil
 	self.State = "Inactive"
 	self.Target = nil
 	self.Velocity = Vector3.zero
 	self.Revision += 1
 	if self.Part then self.Part:Destroy(); self.Part = nil end
 	self:_assertCount(0)
+	if hadTarget then self.Event:FireAllClients(CombatTypes.Event(CombatTypes.EventKind.BallTargetChanged, { TargetId = "", Revision = self.Revision })) end
 	self:Publish()
 end
 
@@ -74,13 +79,15 @@ function BallCore:GetKinematics() return self.Position, self.Velocity end
 
 function BallCore:Redirect(source)
 	if not self:IsTracking() or self.Target ~= source then return false end
-	local target = self:_other(source)
+	local target = self:SelectTargetAfter(source)
 	if not target then return false end
 	self.Rally += 1
 	self.Revision += 1
 	self.Target = target
 	local speed = Config.SpeedForRally(self.Rally)
 	self.Velocity = (target.CenterPart.Position - self.Position).Unit * speed
+	self.Event:FireAllClients(CombatTypes.Event(CombatTypes.EventKind.BallTargetChanged, { TargetId = target.Id, Revision = self.Revision }))
+	self.Event:FireAllClients(CombatTypes.Event(CombatTypes.EventKind.RallyChanged, { Rally = self.Rally }))
 	self:Publish()
 	return true
 end
@@ -95,10 +102,16 @@ function BallCore:_hit(segment)
 	if not fraction then return false end
 	self.Position += segment * fraction
 	self.Registry:SetAlive(target, false)
-	self.Event:FireAllClients({ Kind = "BodyHit", TargetId = target.Id, Position = self.Position, Rally = self.Rally })
+	self.Event:FireAllClients(CombatTypes.Event(CombatTypes.EventKind.CombatantHit, {
+		TargetId = target.Id, Position = self.Position, Rally = self.Rally,
+	}))
+	if Config.Telemetry.Enabled then
+		print(string.format("[COMBAT] state=Active result=HIT target=%s rally=%d speed=%.2f", target.Id, self.Rally, self.Velocity.Magnitude))
+	end
 	self.State = "Resolved"
 	self.Target = nil
 	self.Revision += 1
+	self.Event:FireAllClients(CombatTypes.Event(CombatTypes.EventKind.BallTargetChanged, { TargetId = "", Revision = self.Revision }))
 	self:Publish()
 	return true
 end
