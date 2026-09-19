@@ -42,6 +42,43 @@ for _, speed in { 50, 100, 200, 300 } do
 	check(hit, "swept hurt collision prevents tunneling at " .. speed)
 end
 
+local lead = trajectory.InterceptDirection(roblox.Vector3.zero, 30, roblox.Vector3.new(30, 0, 0), roblox.Vector3.new(0, 8, 0))
+check(lead.Y > 0 and lead.X > 0, "intercept solution leads a laterally moving target")
+
+local function terminalSimulation(initialDirection, speed, moving)
+	local position = roblox.Vector3.new(-20, 0, 0)
+	local velocity = initialDirection.Unit * speed
+	local target = roblox.Vector3.zero
+	local minimum = math.huge
+	local terminal = false
+	for step = 1, 600 do
+		local dt = 1 / 60
+		local targetVelocity = if moving then roblox.Vector3.new(0, if step < 90 then 7 else -7, 0) else roblox.Vector3.zero
+		target += targetVelocity * dt
+		local offset = target - position
+		local distance = offset.Magnitude
+		local direct = offset.Unit
+		local contactTime = math.max(0, distance - config.Hurt.BodyRadius - config.Ball.Radius) / speed
+		if distance <= config.Ball.TerminalDistance or contactTime <= config.Ball.TerminalTime or distance > minimum + config.Ball.OvershootTolerance or velocity.Unit:Dot(direct) <= 0 then terminal = true end
+		minimum = math.min(minimum, distance)
+		local desired = trajectory.InterceptDirection(position, speed, target, targetVelocity)
+		local direction = trajectory.RotateTowards(velocity.Unit, desired, (terminal and config.Ball.TerminalTurnRate or config.Ball.HomingRate) * dt)
+		local segment = direction * speed * dt
+		if trajectory.SweptSphereVsVerticalCapsuleTime(position, segment, target, config.Hurt.BodyRadius, config.Hurt.BodyHeight, config.Ball.Radius) then return true end
+		position += segment
+		velocity = direction * speed
+	end
+	return false
+end
+
+for _, speed in { config.Ball.BaseSpeed, config.SpeedForRally(6), config.Ball.MaxSpeed } do
+	for _, direction in {
+		roblox.Vector3.new(1, 0, 0), roblox.Vector3.new(1, 1.4, 0),
+		roblox.Vector3.new(1, -1.4, 0), roblox.Vector3.new(1, 0, 1.4),
+	} do check(terminalSimulation(direction, speed, false), "terminal intercept prevents stable orbit at speed " .. speed) end
+end
+check(terminalSimulation(roblox.Vector3.new(1, 0, 1.2), config.SpeedForRally(3), true), "lead reacquires a target that changes lateral direction")
+
 local configToken, mathToken, typesToken = {}, {}, {}
 local replicated = { Game = { Shared = { Config = { CombatConfig = configToken }, Combat = { CombatTypes = typesToken }, Util = { TrajectoryMath = mathToken } } } }
 local now = 10

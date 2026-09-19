@@ -46,7 +46,7 @@ function Registry:GetByPlayer(player) return self.ByPlayer[player] end
 function Registry:Get(id) return self.ById[id] end
 
 function Registry:IsAlive(combatant)
-	return combatant ~= nil and combatant.Alive and combatant.Character and combatant.Character.Parent
+	return combatant ~= nil and self.ById[combatant.Id] == combatant and combatant.Alive and combatant.Character and combatant.Character.Parent
 		and combatant.Humanoid and combatant.Humanoid.Health > 0 and combatant.CenterPart and combatant.CenterPart.Parent
 end
 

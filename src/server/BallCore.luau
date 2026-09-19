@@ -13,6 +13,7 @@ function BallCore.new(registry, snapshotRemote, combatEvent, gameplay, targetSel
 		Part = nil, State = "Inactive", Position = Vector3.zero, Velocity = Vector3.zero,
 		TargetSelector = targetSelector, Definition = BallDefinitions.StandardBall,
 		Target = nil, Rally = 0, Revision = 0, SnapshotClock = 0,
+		Terminal = false, MinTargetDistance = math.huge,
 	}, BallCore)
 end
 
@@ -44,6 +45,8 @@ function BallCore:Start(preferredTarget)
 		self.Position = target.CenterPart.Position + Vector3.new(0, 0, Config.Parry.DefensiveRadius + 1)
 	end
 	self.Target = target
+	self.Terminal = false
+	self.MinTargetDistance = math.huge
 	self.Rally = 0
 	self.Revision += 1
 	self.Velocity = (target.CenterPart.Position - self.Position).Unit * Config.Ball.BaseSpeed
@@ -86,6 +89,8 @@ function BallCore:Redirect(source, aimDirection)
 	self.Rally += 1
 	self.Revision += 1
 	self.Target = target
+	self.Terminal = false
+	self.MinTargetDistance = math.huge
 	local speed = Config.SpeedForRally(self.Rally)
 	local targetDirection = (target.CenterPart.Position - self.Position).Unit
 	local initialDirection = targetDirection
@@ -132,6 +137,8 @@ function BallCore:Update(dt, beforeStep)
 		local target = self:SelectTargetAfter(nil)
 		if not target then self.State = "Resolved"; self.Target = nil; return end
 		self.Target = target
+		self.Terminal = false
+		self.MinTargetDistance = math.huge
 		self.Revision += 1
 		self.Velocity = (target.CenterPart.Position - self.Position).Unit * Config.SpeedForRally(self.Rally)
 		self.Event:FireAllClients(CombatTypes.Event(CombatTypes.EventKind.BallTargetChanged, { TargetId = target.Id, Revision = self.Revision }))
@@ -143,9 +150,22 @@ function BallCore:Update(dt, beforeStep)
 		if not self:IsTracking() or not self.Target then break end
 		if beforeStep then beforeStep() end
 		if not self:IsTracking() or not self.Target then break end
-		local desired = (self.Target.CenterPart.Position - self.Position).Unit
-		local direction = TrajectoryMath.RotateTowards(self.Velocity.Unit, desired, Config.Ball.HomingRate * stepDt)
-		self.Velocity = direction * Config.SpeedForRally(self.Rally)
+		local offset = self.Target.CenterPart.Position - self.Position
+		local distance = offset.Magnitude
+		local direct = if distance > 1e-6 then offset.Unit else self.Velocity.Unit
+		local targetVelocity = self.Target.RootPart.AssemblyLinearVelocity or Vector3.zero
+		local speed = Config.SpeedForRally(self.Rally)
+		local desired = TrajectoryMath.InterceptDirection(self.Position, speed, self.Target.CenterPart.Position, targetVelocity)
+		local contactDistance = Config.Hurt.BodyRadius + Config.Ball.Radius
+		local contactTime = math.max(0, distance - contactDistance) / math.max(speed, 1e-6)
+		if distance <= Config.Ball.TerminalDistance or contactTime <= Config.Ball.TerminalTime
+			or distance > self.MinTargetDistance + Config.Ball.OvershootTolerance or self.Velocity.Unit:Dot(direct) <= 0 then
+			self.Terminal = true
+		end
+		self.MinTargetDistance = math.min(self.MinTargetDistance, distance)
+		local turnRate = if self.Terminal then Config.Ball.TerminalTurnRate else Config.Ball.HomingRate
+		local direction = TrajectoryMath.RotateTowards(self.Velocity.Unit, desired, turnRate * stepDt)
+		self.Velocity = direction * speed
 		local segment = self.Velocity * stepDt
 		if self:_hit(segment) then break end
 		self.Position += segment

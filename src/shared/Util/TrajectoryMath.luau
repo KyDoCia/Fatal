@@ -1,5 +1,28 @@
 local TrajectoryMath = {}
 
+function TrajectoryMath.InterceptDirection(projectilePosition, projectileSpeed, targetPosition, targetVelocity)
+	local offset = targetPosition - projectilePosition
+	local direct = if offset.Magnitude > 1e-6 then offset.Unit else Vector3.zero
+	if projectileSpeed <= 1e-6 then return direct end
+	local a = targetVelocity:Dot(targetVelocity) - projectileSpeed * projectileSpeed
+	local b = 2 * offset:Dot(targetVelocity)
+	local c = offset:Dot(offset)
+	local time
+	if math.abs(a) < 1e-6 then
+		if math.abs(b) > 1e-6 then local candidate = -c / b; if candidate > 0 then time = candidate end end
+	else
+		local discriminant = b * b - 4 * a * c
+		if discriminant >= 0 then
+			local root = math.sqrt(discriminant)
+			local first, second = (-b - root) / (2 * a), (-b + root) / (2 * a)
+			if first > 0 and second > 0 then time = math.min(first, second) elseif first > 0 then time = first elseif second > 0 then time = second end
+		end
+	end
+	if not time or time ~= time or time == math.huge then return direct end
+	local aim = offset + targetVelocity * time
+	return if aim.Magnitude > 1e-6 then aim.Unit else direct
+end
+
 function TrajectoryMath.RotateTowards(current, desired, maxRadians)
 	local from = current.Unit
 	local to = desired.Unit
