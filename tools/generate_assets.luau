@@ -54,27 +54,39 @@ fs.writeFile("assets/World.rbxm", roblox.serializeModel({ world }))
 local ball = Instance.new("Part")
 ball.Name = "CombatBall"
 ball.Shape = Enum.PartType.Ball
-ball.Size = Vector3.one * 1.1
-ball.Color = Color3.fromRGB(238, 54, 66)
+ball.Size = Vector3.one * 2
+ball.Color = Color3.fromRGB(255, 76, 58)
 ball.Material = Enum.Material.Neon
 ball.Anchored = true
 ball.CanCollide = false
 ball.CanTouch = false
 ball.CanQuery = false
 local top = Instance.new("Attachment")
-top.Position = Vector3.new(0, 0.25, 0)
+top.Position = Vector3.new(0, 0.45, 0)
 top.Parent = ball
 local bottom = Instance.new("Attachment")
-bottom.Position = Vector3.new(0, -0.25, 0)
+bottom.Position = Vector3.new(0, -0.45, 0)
 bottom.Parent = ball
 local trail = Instance.new("Trail")
 trail.Attachment0 = top
 trail.Attachment1 = bottom
 trail.Color = ColorSequence.new(ball.Color)
-trail.Lifetime = 0.12
-trail.LightEmission = 1
+trail.Lifetime = 0.1
+trail.LightEmission = 0.8
 trail.FaceCamera = true
 trail.Parent = ball
+local light = Instance.new("PointLight")
+light.Name = "CoreLight"
+light.Color = ball.Color
+light.Brightness = 0.8
+light.Range = 5
+light.Parent = ball
+for _, name in { "ParrySound", "HitSound" } do
+	local sound = Instance.new("Sound")
+	sound.Name = name
+	sound.Volume = 0.35
+	sound.Parent = ball
+end
 fs.writeFile("assets/CombatBall.rbxm", roblox.serializeModel({ ball }))
 
 local gui = Instance.new("ScreenGui")

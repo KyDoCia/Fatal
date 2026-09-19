@@ -71,7 +71,10 @@ function DuelService:_step(dt)
 			self.State = "Playing"
 		end
 	elseif self.State == "Playing" then
-		self.Ball:Update(dt, function() self.Opponent:Update() end)
+		self.Ball:Update(dt, function()
+			self.Combat:UpdatePending()
+			self.Opponent:Update()
+		end)
 		if #self.Registry:GetAlive() <= 1 then self:_finish() end
 	elseif self.State == "Ending" and now >= self.Deadline then
 		self.Opponent:Clear()

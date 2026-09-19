@@ -33,7 +33,13 @@ function BallCore:Start(preferredTarget)
 	self:_assertCount(0)
 	local target = preferredTarget or self.Registry:GetAlive()[1]
 	assert(target, "ball requires target")
-	self.Position = Vector3.new(0, Config.Ball.SpawnHeight, 0)
+	local source = self:_other(target)
+	if source then
+		local launchDirection = (target.CenterPart.Position - source.CenterPart.Position).Unit
+		self.Position = source.CenterPart.Position + launchDirection * Config.Ball.LaunchOffset
+	else
+		self.Position = target.CenterPart.Position + Vector3.new(0, 0, Config.Parry.DefensiveRadius + 1)
+	end
 	self.Target = target
 	self.Rally = 0
 	self.Revision += 1
@@ -89,7 +95,7 @@ function BallCore:_hit(segment)
 	if not fraction then return false end
 	self.Position += segment * fraction
 	self.Registry:SetAlive(target, false)
-	self.Event:FireAllClients({ Kind = "Hit", Position = self.Position, Rally = self.Rally })
+	self.Event:FireAllClients({ Kind = "BodyHit", TargetId = target.Id, Position = self.Position, Rally = self.Rally })
 	self.State = "Resolved"
 	self.Target = nil
 	self.Revision += 1

@@ -1,18 +1,19 @@
 local Config = {
 	CombatDebug = false,
 	Ball = {
-		Radius = 0.55,
-		SpawnHeight = 5,
-		BaseSpeed = 70,
-		MaxSpeed = 260,
-		SpeedPerRally = 12,
+		Radius = 1,
+		LaunchOffset = 2,
+		BaseSpeed = 28,
+		MaxSpeed = 140,
+		SpeedPerRally = 4,
 		HomingRate = 2.4,
 		MaxDeltaTime = 0.1,
 		MaxTravelPerStep = 1.5,
 		SnapshotInterval = 1 / 20,
 	},
 	Parry = {
-		DefensiveRadius = 12,
+		DefensiveRadius = 10,
+		EarlyBuffer = 0.12,
 		Cooldown = 0.1,
 		ApproachEpsilon = 0.1,
 	},
@@ -21,7 +22,7 @@ local Config = {
 		BodyHeight = 5.4,
 	},
 	NPC = {
-		ReactionRadius = 12,
+		ReactionRadius = 10,
 		ReactionDelay = 0,
 		MissChance = 0,
 	},
@@ -34,6 +35,16 @@ local Config = {
 
 function Config.SpeedForRally(rally)
 	return math.min(Config.Ball.MaxSpeed, Config.Ball.BaseSpeed + math.max(0, rally) * Config.Ball.SpeedPerRally)
+end
+
+function Config.FirstApproachSeconds(separation)
+	local travel = math.max(0, separation - Config.Ball.LaunchOffset - Config.Parry.DefensiveRadius)
+	return travel / Config.Ball.BaseSpeed
+end
+
+function Config.ParryOpportunityMilliseconds(speed)
+	local hurtContact = Config.Hurt.BodyRadius + Config.Ball.Radius
+	return math.max(0, Config.Parry.DefensiveRadius - hurtContact) / speed * 1000
 end
 
 return table.freeze(Config)

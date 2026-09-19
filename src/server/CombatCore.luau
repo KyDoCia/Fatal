@@ -1,24 +1,50 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Game.Shared.Config.CombatConfig)
-local TrajectoryMath = require(ReplicatedStorage.Game.Shared.Util.TrajectoryMath)
 
 local CombatCore = {}
 CombatCore.__index = CombatCore
 
 function CombatCore.new(registry, combatEvent)
-	return setmetatable({ Registry = registry, Event = combatEvent, Ball = nil, Active = false, ReadyAt = {} }, CombatCore)
+	return setmetatable({ Registry = registry, Event = combatEvent, Ball = nil, Active = false, ReadyAt = {}, Pending = {} }, CombatCore)
 end
 
 function CombatCore:SetBall(ball) assert(not self.Ball, "ball already assigned"); self.Ball = ball end
-function CombatCore:SetActive(active) self.Active = active; if not active then table.clear(self.ReadyAt) end end
+function CombatCore:SetActive(active)
+	self.Active = active
+	if not active then table.clear(self.ReadyAt); table.clear(self.Pending) end
+end
 
-function CombatCore:_result(actor, accepted, reason, distance, approach)
+function CombatCore:_metrics(actor)
+	local position, velocity = self.Ball:GetKinematics()
+	local offset = actor.CenterPart.Position - position
+	local distance = offset.Magnitude
+	local approach = if distance < 1e-6 then velocity.Magnitude else velocity:Dot(offset.Unit)
+	local contactDistance = Config.Hurt.BodyRadius + Config.Ball.Radius
+	local contactMs = if approach > Config.Parry.ApproachEpsilon then math.max(0, distance - contactDistance) / approach * 1000 else math.huge
+	return { Position = position, Speed = velocity.Magnitude, Distance = distance, Approach = approach, ContactMs = contactMs }
+end
+
+function CombatCore:_result(actor, accepted, reason, metrics, mode)
 	if Config.CombatDebug then
-		print(string.format("[V2/PARRY] actor=%s result=%s reason=%s distance=%.2f approach=%.2f revision=%d",
-			actor and actor.Id or "none", accepted and "ACCEPT" or "REJECT", reason, distance or -1, approach or -1,
+		print(string.format("[V3/PARRY] actor=%s result=%s reason=%s mode=%s distance=%.2f speed=%.2f hurtMs=%s revision=%d",
+			actor and actor.Id or "none", accepted and "ACCEPT" or "REJECT", reason, mode or "INPUT",
+			metrics and metrics.Distance or -1, metrics and metrics.Speed or -1,
+			metrics and metrics.ContactMs < math.huge and string.format("%.0f", metrics.ContactMs) or "INF",
 			self.Ball and self.Ball:GetRevision() or -1))
 	end
 	return accepted, reason
+end
+
+function CombatCore:_redirect(actor, metrics, mode, now)
+	if now < (self.ReadyAt[actor.Id] or 0) then return self:_result(actor, false, "COOLDOWN", metrics, mode) end
+	if not self.Ball:Redirect(actor) then return self:_result(actor, false, "REDIRECT_REJECTED", metrics, mode) end
+	self.ReadyAt[actor.Id] = now + Config.Parry.Cooldown
+	self.Pending[actor.Id] = nil
+	self.Event:FireAllClients({
+		Kind = "ParryConfirmed", ActorId = actor.Id, Position = metrics.Position,
+		Rally = self.Ball:GetRally(), Mode = mode,
+	})
+	return self:_result(actor, true, "PARRIED", metrics, mode)
 end
 
 function CombatCore:TryParry(actor)
@@ -26,18 +52,37 @@ function CombatCore:TryParry(actor)
 	if not self.Registry:IsAlive(actor) then return self:_result(actor, false, "DEAD") end
 	if self.Ball:GetTarget() ~= actor then return self:_result(actor, false, "NOT_TARGET") end
 	local now = workspace:GetServerTimeNow()
-	if now < (self.ReadyAt[actor.Id] or 0) then return self:_result(actor, false, "COOLDOWN") end
-	self.ReadyAt[actor.Id] = now + Config.Parry.Cooldown
-	local position, velocity = self.Ball:GetKinematics()
-	local center = actor.CenterPart.Position
-	local offset = center - position
-	local distance = offset.Magnitude
-	local approach = if distance < 1e-6 then velocity.Magnitude else velocity:Dot(offset.Unit)
-	if approach <= Config.Parry.ApproachEpsilon then return self:_result(actor, false, "NOT_APPROACHING", distance, approach) end
-	if distance > Config.Parry.DefensiveRadius then return self:_result(actor, false, "OUT_OF_RANGE", distance, approach) end
-	if not self.Ball:Redirect(actor) then return self:_result(actor, false, "REDIRECT_REJECTED", distance, approach) end
-	self.Event:FireAllClients({ Kind = "Parry", ActorId = actor.Id, Position = position, Rally = self.Ball:GetRally() })
-	return self:_result(actor, true, "PARRIED", distance, approach)
+	local metrics = self:_metrics(actor)
+	if metrics.Approach <= Config.Parry.ApproachEpsilon then return self:_result(actor, false, "NOT_APPROACHING", metrics) end
+	if metrics.Distance <= Config.Parry.DefensiveRadius then return self:_redirect(actor, metrics, "IMMEDIATE", now) end
+	if actor.Kind ~= "Player" then return self:_result(actor, false, "OUT_OF_RANGE", metrics) end
+	local pending = self.Pending[actor.Id]
+	if pending and now <= pending.ExpiresAt then return self:_result(actor, false, "PENDING", metrics) end
+	local secondsToRange = (metrics.Distance - Config.Parry.DefensiveRadius) / metrics.Approach
+	if secondsToRange > Config.Parry.EarlyBuffer then return self:_result(actor, false, "OUT_OF_RANGE", metrics) end
+	self.Pending[actor.Id] = { Actor = actor, ExpiresAt = now + Config.Parry.EarlyBuffer, Revision = self.Ball:GetRevision() }
+	return self:_result(actor, true, "BUFFERED", metrics, "PENDING")
+end
+
+function CombatCore:UpdatePending()
+	if not self.Active or not self.Ball or not self.Ball:IsTracking() then table.clear(self.Pending); return end
+	local now = workspace:GetServerTimeNow()
+	for id, pending in self.Pending do
+		local actor = pending.Actor
+		if now > pending.ExpiresAt then
+			self.Pending[id] = nil
+			self:_result(actor, false, "BUFFER_EXPIRED", self:_metrics(actor), "BUFFERED")
+		elseif not self.Registry:IsAlive(actor) or self.Ball:GetTarget() ~= actor or self.Ball:GetRevision() ~= pending.Revision then
+			self.Pending[id] = nil
+		else
+			local metrics = self:_metrics(actor)
+			if metrics.Approach <= Config.Parry.ApproachEpsilon then
+				self.Pending[id] = nil
+			elseif metrics.Distance <= Config.Parry.DefensiveRadius then
+				self:_redirect(actor, metrics, "BUFFERED", now)
+			end
+		end
+	end
 end
 
 return CombatCore

@@ -42,7 +42,10 @@ local replicated = place:GetService("ReplicatedStorage").Game
 for _, name in { "ParryIntent", "BallSnapshot", "CombatEvent" } do assert(replicated.Remotes[name]:IsA("RemoteEvent"), "missing remote " .. name) end
 assert(#replicated.Assets:GetChildren() == 1, "V2 assets must contain only the gameplay ball source")
 local ball = replicated.Assets.CombatBall
-assert(ball:IsA("BasePart") and (ball.Size - roblox.Vector3.one * 1.1).Magnitude < 1e-4, "built ball must be 1.1 studs on every axis")
+assert(ball:IsA("BasePart") and (ball.Size - roblox.Vector3.one * 2).Magnitude < 1e-4, "built ball must be 2 studs on every axis")
+assert(ball:FindFirstChildOfClass("Trail"), "built ball must preserve the readable motion trail")
+assert(ball:FindFirstChild("CoreLight") and ball.CoreLight:IsA("PointLight"), "built ball must expose the parry flash light")
+assert(ball:FindFirstChild("ParrySound") and ball.ParrySound:IsA("Sound") and ball:FindFirstChild("HitSound") and ball.HitSound:IsA("Sound"), "built ball must expose empty sound hooks")
 
 local starterGui = place:GetService("StarterGui")
 local guiChildren = starterGui:GetChildren()
@@ -80,6 +83,7 @@ local gameplay = world.Arena.Gameplay
 local spawns = gameplay.SpawnPoints:GetChildren()
 table.sort(spawns, function(a, b) return a.Name < b.Name end)
 assert(#spawns == 2, "clean duel requires exactly two spawn references")
+assert(math.abs((spawns[2].CFrame.Position - spawns[1].CFrame.Position).Magnitude - 40) < 1e-4, "duel spawn separation must preserve the one-second opening read")
 for _, spawn in spawns do assert(spawn.Transparency == 1 and not spawn.CanCollide and not spawn.CanTouch and not spawn.CanQuery, "spawn references must be invisible") end
 local between = (spawns[2].CFrame.Position - spawns[1].CFrame.Position).Unit
 assert(spawns[1].CFrame.LookVector:Dot(between) > 0.999 and spawns[2].CFrame.LookVector:Dot(-between) > 0.999, "duel spawns must face each other")
@@ -88,4 +92,4 @@ local savedBalls = 0
 for _, value in place:GetService("Workspace"):GetDescendants() do if value:GetAttribute("FatalV2Ball") then savedBalls += 1 end end
 assert(savedBalls == 0, "saved place contains an authoritative gameplay ball")
 
-print("PASS: clean-room place has 10 scripts, RallyGui only, 1.1-stud ball, no legacy presentation")
+print("PASS: clean-room place has 10 scripts, RallyGui only, 2-stud readable ball, no legacy presentation")
