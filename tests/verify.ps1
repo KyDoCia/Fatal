@@ -10,7 +10,7 @@ foreach ($build in @($canonicalBuild, $legacyBuild)) {
 
 $legacySource = @(& rg -n -i -e "FIGHT" -e "CRITICAL" -e "TimeToImpact" -e "TargetIndicator" -e "CombatGui" -e "RoundGui" -e "FatalCombatDebug" -e "BallRadius" -e "HurtVolume" -e "ReticleStroke" -e "FatalImpact" -e "FatalParryRing" -e "ActiveUntil" -e "ArmedRevision" -e "TryConfirm" src tools default.project.json)
 if ($legacySource.Count -ne 0) { throw "rejected legacy presentation source found: $legacySource" }
-$ballCloneSites = @(& rg -n -F "CombatBall:Clone()" src/server)
+$ballCloneSites = @(& rg -n -F "self.Definition.AssetName]:Clone()" src/server)
 if ($ballCloneSites.Count -ne 1) { throw "expected exactly one gameplay ball clone site: $ballCloneSites" }
 $heartbeat = @(& rg -l -F "Heartbeat:Connect" src/server)
 if ($heartbeat.Count -ne 1 -or $heartbeat[0] -notmatch "GameServer") { throw "expected one server heartbeat owner" }

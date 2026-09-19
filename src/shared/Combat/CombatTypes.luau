@@ -4,6 +4,7 @@ CombatTypes.ProtocolVersion = 1
 
 CombatTypes.DuelState = table.freeze({
 	Waiting = "Waiting",
+	Intermission = "Intermission",
 	Countdown = "Countdown",
 	Active = "Active",
 	Ending = "Ending",
@@ -15,7 +16,9 @@ CombatTypes.EventKind = table.freeze({
 	BallTargetChanged = "BallTargetChanged",
 	ParryConfirmed = "ParryConfirmed",
 	CombatantHit = "CombatantHit",
+	CombatantEliminated = "CombatantEliminated",
 	RallyChanged = "RallyChanged",
+	RoundEnded = "RoundEnded",
 })
 
 function CombatTypes.Event(kind, payload)

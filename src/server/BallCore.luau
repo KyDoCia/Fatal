@@ -2,14 +2,16 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Game.Shared.Config.CombatConfig)
 local TrajectoryMath = require(ReplicatedStorage.Game.Shared.Util.TrajectoryMath)
 local CombatTypes = require(ReplicatedStorage.Game.Shared.Combat.CombatTypes)
+local BallDefinitions = require(ReplicatedStorage.Game.Shared.Balls.BallDefinitions)
 
 local BallCore = {}
 BallCore.__index = BallCore
 
-function BallCore.new(registry, snapshotRemote, combatEvent, gameplay)
+function BallCore.new(registry, snapshotRemote, combatEvent, gameplay, targetSelector)
 	return setmetatable({
 		Registry = registry, Snapshot = snapshotRemote, Event = combatEvent, Gameplay = gameplay,
 		Part = nil, State = "Inactive", Position = Vector3.zero, Velocity = Vector3.zero,
+		TargetSelector = targetSelector, Definition = BallDefinitions.StandardBall,
 		Target = nil, Rally = 0, Revision = 0, SnapshotClock = 0,
 	}, BallCore)
 end
@@ -25,8 +27,8 @@ function BallCore:_assertCount(expected)
 end
 
 function BallCore:SelectTargetAfter(source)
+	if self.TargetSelector then return self.TargetSelector.Select(self.Registry, source) end
 	for _, combatant in self.Registry:GetAlive() do if combatant ~= source then return combatant end end
-	return nil
 end
 
 function BallCore:Start(preferredTarget)
@@ -45,7 +47,7 @@ function BallCore:Start(preferredTarget)
 	self.Rally = 0
 	self.Revision += 1
 	self.Velocity = (target.CenterPart.Position - self.Position).Unit * Config.Ball.BaseSpeed
-	local part = ReplicatedStorage.Game.Assets.CombatBall:Clone()
+	local part = ReplicatedStorage.Game.Assets[self.Definition.AssetName]:Clone()
 	part.Name = "CombatBallV2"
 	part.Size = Vector3.one * Config.Ball.Radius * 2
 	part.CFrame = CFrame.new(self.Position)
@@ -105,6 +107,9 @@ function BallCore:_hit(segment)
 	self.Event:FireAllClients(CombatTypes.Event(CombatTypes.EventKind.CombatantHit, {
 		TargetId = target.Id, Position = self.Position, Rally = self.Rally,
 	}))
+	self.Event:FireAllClients(CombatTypes.Event(CombatTypes.EventKind.CombatantEliminated, {
+		CombatantId = target.Id, Rally = self.Rally,
+	}))
 	if Config.Telemetry.Enabled then
 		print(string.format("[COMBAT] state=Active result=HIT target=%s rally=%d speed=%.2f", target.Id, self.Rally, self.Velocity.Magnitude))
 	end
@@ -118,7 +123,14 @@ end
 
 function BallCore:Update(dt, beforeStep)
 	if not self:IsTracking() then return end
-	if not self.Registry:IsAlive(self.Target) then self.State = "Resolved"; self.Target = nil; return end
+	if not self.Registry:IsAlive(self.Target) then
+		local target = self:SelectTargetAfter(nil)
+		if not target then self.State = "Resolved"; self.Target = nil; return end
+		self.Target = target
+		self.Revision += 1
+		self.Velocity = (target.CenterPart.Position - self.Position).Unit * Config.SpeedForRally(self.Rally)
+		self.Event:FireAllClients(CombatTypes.Event(CombatTypes.EventKind.BallTargetChanged, { TargetId = target.Id, Revision = self.Revision }))
+	end
 	local bounded = math.min(dt, Config.Ball.MaxDeltaTime)
 	local steps = math.max(1, math.ceil(self.Velocity.Magnitude * bounded / Config.Ball.MaxTravelPerStep))
 	local stepDt = bounded / steps

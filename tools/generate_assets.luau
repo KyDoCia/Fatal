@@ -41,8 +41,13 @@ npcs.Parent = gameplay
 local spawns = Instance.new("Folder")
 spawns.Name = "SpawnPoints"
 spawns.Parent = gameplay
-for index, x in { -20, 20 } do
-	local position = Vector3.new(x, 0.1, 0)
+local spawnPositions = {
+	Vector3.new(-20, 0.1, 0), Vector3.new(20, 0.1, 0),
+	Vector3.new(0, 0.1, -20), Vector3.new(0, 0.1, 20),
+	Vector3.new(-14, 0.1, -14), Vector3.new(14, 0.1, 14),
+	Vector3.new(-14, 0.1, 14), Vector3.new(14, 0.1, -14),
+}
+for index, position in spawnPositions do
 	local spawn = part(string.format("Spawn%02d", index), Vector3.new(3, 0.2, 3), CFrame.lookAt(position, Vector3.new(0, 0.1, 0)), Color3.fromRGB(70, 75, 86), spawns)
 	spawn.Transparency = 1
 	spawn.CanCollide = false

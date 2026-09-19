@@ -33,7 +33,9 @@
         "CombatCore": { "$path": "src/server/CombatCore.luau" },
         "BallCore": { "$path": "src/server/BallCore.luau" },
         "TrainingOpponent": { "$path": "src/server/TrainingOpponent.luau" },
-        "DuelService": { "$path": "src/server/DuelService.luau" }
+        "DuelService": { "$path": "src/server/DuelService.luau" },
+        "ProfileService": { "$path": "src/server/ProfileService.luau" },
+        "TargetSelector": { "$path": "src/server/TargetSelector.luau" }
       }
     },
     "StarterPlayer": {

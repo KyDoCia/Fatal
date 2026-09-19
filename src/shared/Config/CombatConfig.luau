@@ -15,6 +15,7 @@ local Config = {
 		DefensiveRadius = 10,
 		EarlyBuffer = 0.12,
 		Cooldown = 0.1,
+		IntentMinInterval = 0.025,
 		ApproachEpsilon = 0.1,
 	},
 	Hurt = {
@@ -32,9 +33,15 @@ local Config = {
 		CameraImpulse = 0.18,
 	},
 	Duel = {
+		Intermission = 1,
 		Countdown = 0.5,
 		Ending = 1.2,
 		CharacterTimeout = 8,
+	},
+	Rewards = {
+		MinimumHumansForWin = 3,
+		WinnerCoins = 100,
+		WinnerGems = 0,
 	},
 }
 

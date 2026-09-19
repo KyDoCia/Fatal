@@ -14,6 +14,7 @@ end
 
 local config = load("src/shared/Config/CombatConfig.luau", {})
 local combatTypes = load("src/shared/Combat/CombatTypes.luau", {})
+local ballDefinitions = load("src/shared/Balls/BallDefinitions.luau", {})
 check(config.Ball.Radius > 0 and config.Parry.DefensiveRadius > config.Hurt.BodyRadius + config.Ball.Radius, "visual, hurt, and defensive geometry remain separate")
 check(config.SpeedForRally(0) < config.SpeedForRally(3) and config.SpeedForRally(1000) == config.Ball.MaxSpeed, "rally speed progresses monotonically and caps")
 local separation = 40
@@ -23,6 +24,10 @@ check(config.ParryOpportunityMilliseconds(config.SpeedForRally(0)) > config.Parr
 check(config.NPC.ReactionRadius == config.Parry.DefensiveRadius, "Combat Lab NPC returns every valid defensive crossing")
 
 local trajectory = load("src/shared/Util/TrajectoryMath.luau", {})
+local targetSelector = load("src/server/TargetSelector.luau", {})
+local targetA, targetB, targetC = { Id = "A" }, { Id = "B" }, { Id = "C" }
+local targetRegistry = { GetAlive = function() return { targetA, targetB, targetC } end }
+check(targetSelector.Select(targetRegistry, targetA) == targetB and targetSelector.Select(targetRegistry, targetB) == targetC, "multiplayer target selection advances past the previous defender")
 check(trajectory.IsApproaching(roblox.Vector3.new(10, 0, 0), roblox.Vector3.new(-50, 0, 0), roblox.Vector3.zero, 0.1), "incoming direction is accepted")
 check(not trajectory.IsApproaching(roblox.Vector3.new(10, 0, 0), roblox.Vector3.new(50, 0, 0), roblox.Vector3.zero, 0.1), "outgoing direction is rejected")
 for _, speed in { 50, 100, 200, 300 } do
@@ -169,8 +174,8 @@ end
 
 local place = roblox.deserializePlace(fs.readFile("Fatal.rbxlx"))
 local actualGame = place:GetService("ReplicatedStorage").Game
-local ballConfigToken, ballMathToken, ballTypesToken = {}, {}, {}
-local ballReplicated = { Game = { Shared = { Config = { CombatConfig = ballConfigToken }, Combat = { CombatTypes = ballTypesToken }, Util = { TrajectoryMath = ballMathToken } }, Assets = { CombatBall = actualGame.Assets.CombatBall } } }
+local ballConfigToken, ballMathToken, ballTypesToken, ballDefinitionsToken = {}, {}, {}, {}
+local ballReplicated = { Game = { Shared = { Config = { CombatConfig = ballConfigToken }, Combat = { CombatTypes = ballTypesToken }, Balls = { BallDefinitions = ballDefinitionsToken }, Util = { TrajectoryMath = ballMathToken } }, Assets = { CombatBall = actualGame.Assets.CombatBall } } }
 local gameplay = place:GetService("Workspace").Game.Arena.Gameplay
 local first = { Id = "P:first", Alive = true, CenterPart = { Position = roblox.Vector3.new(-20, 4, 0) }, RootPart = { Position = roblox.Vector3.new(-20, 3, 0) } }
 local second = { Id = "N:second", Alive = true, CenterPart = { Position = roblox.Vector3.new(20, 4, 0) }, RootPart = { Position = roblox.Vector3.new(20, 3, 0) } }
@@ -182,7 +187,7 @@ local ballRegistry = {
 }
 local BallCore = load("src/server/BallCore.luau", {
 	game = { GetService = function(_, name) if name == "ReplicatedStorage" then return ballReplicated end; error(name) end },
-	require = function(module) if module == ballConfigToken then return config elseif module == ballMathToken then return trajectory elseif module == ballTypesToken then return combatTypes end; error("dependency") end,
+	require = function(module) if module == ballConfigToken then return config elseif module == ballMathToken then return trajectory elseif module == ballTypesToken then return combatTypes elseif module == ballDefinitionsToken then return ballDefinitions end; error("dependency") end,
 })
 local remote = { FireAllClients = function() end }
 local ballCore = BallCore.new(ballRegistry, remote, remote, gameplay)
@@ -248,6 +253,9 @@ local DuelService = load("src/server/DuelService.luau", {
 	workspace = { GetServerTimeNow = function() return now end },
 	require = function(module) if module == duelConfigToken then return config elseif module == characterToken then return {} elseif module == duelTypesToken then return combatTypes end; error("dependency") end,
 })
+check(not DuelService.IsWinEligible(2), "two humans cannot produce a Win")
+check(not DuelService.IsWinEligible(2), "two humans plus any training NPC still cannot produce a Win")
+check(DuelService.IsWinEligible(3), "three humans freeze an eligible round")
 local duelPlayer = { Id = "P:duel", Alive = true }
 local duelNPC = { Id = "N:duel", Alive = true }
 local duelAlive = { duelPlayer, duelNPC }
@@ -257,7 +265,7 @@ local duelRegistry = {
 	GetAlive = function() return duelAlive end,
 	SetAlive = function(_, subject, value) subject.Alive = value; return true end,
 }
-local duelBall = { Starts = 0, Stops = 0, Start = function(self) self.Starts += 1 end, Stop = function(self) self.Stops += 1 end, Update = function() end }
+local duelBall = { Starts = 0, Stops = 0, Tracking = false, Start = function(self) self.Starts += 1; self.Tracking = true end, Stop = function(self) self.Stops += 1; self.Tracking = false end, IsTracking = function(self) return self.Tracking end, Update = function() end }
 local duelCombat = { SetActive = function() end }
 local duelOpponent = { Combatant = duelNPC, Clears = 0, Clear = function(self) self.Clears += 1 end, Update = function() end }
 local spawnFolder = { GetChildren = function() return { { Name = "Spawn01" }, { Name = "Spawn02" } } end }
@@ -268,18 +276,55 @@ local duel = DuelService.new(duelRegistry, duelCombat, duelBall, duelOpponent, g
 local preparations = 0
 duel._prepare = function(self) preparations += 1; self:_transition(combatTypes.DuelState.Countdown, config.Duel.Countdown); return true end
 duel:Update(0.01)
+check(duel.State == combatTypes.DuelState.Intermission, "player presence starts intermission")
+now = duel.Deadline
+duel:Update(0.01)
 check(duel.State == combatTypes.DuelState.Countdown and preparations == 1, "duel prepares one Player and one NPC")
 now = duel.Deadline
 duel:Update(0.01)
 check(duel.State == combatTypes.DuelState.Active and duelBall.Starts == 1, "duel starts exactly one ball")
+local duelThird = { Id = "P:third", Alive = true }
+duelAlive = { duelPlayer, duelNPC, duelThird }
+duelBall.Tracking = false
+duel:Update(0.01)
+check(duel.State == combatTypes.DuelState.Active and duelBall.Starts == 2, "multiplayer round replaces a resolved ball after elimination without duplicating it")
 duelAlive = { duelPlayer }
 duel:Update(0.01)
 check(duel.State == combatTypes.DuelState.Ending and duelBall.Stops >= 1, "elimination stops the ball deterministically")
 now = duel.Deadline
 duel:Update(0.01)
 duel:Update(0.01)
+now = duel.Deadline
 duel:Update(0.01)
 check(duel.State == combatTypes.DuelState.Countdown and preparations == 2 and duelOpponent.Clears >= 1, "duel resets and re-enters without accumulated state")
-check(#duelEvents == 6 and duelEvents[1].Kind == combatTypes.EventKind.DuelStateChanged and duelEvents[1].Version == combatTypes.ProtocolVersion, "central lifecycle emits one versioned event per transition")
+local duelTransitions = 0
+for _, event in duelEvents do if event.Kind == combatTypes.EventKind.DuelStateChanged then duelTransitions += 1 end end
+check(duelTransitions == 7 and duelEvents[1].Kind == combatTypes.EventKind.DuelStateChanged and duelEvents[1].Version == combatTypes.ProtocolVersion, "central lifecycle emits one versioned event per transition")
+
+local schema = load("src/shared/Profile/ProfileSchema.luau", {})
+local schemaToken = {}
+local profileReplicated = { Game = { Shared = { Profile = { ProfileSchema = schemaToken } } } }
+local ProfileService = load("src/server/ProfileService.luau", {
+	game = { GetService = function(_, name) if name == "ReplicatedStorage" then return profileReplicated end; error(name) end },
+	require = function(module) if module == schemaToken then return schema end; error("dependency") end,
+	warn = function() end,
+})
+local failedProfiles = ProfileService.new({ GetAsync = function() error("offline") end })
+local failedPlayer = { UserId = 404 }
+check(failedProfiles:Load(failedPlayer) == nil and failedProfiles:Get(failedPlayer) == nil, "failed persistent load cannot create an overwriteable reward profile")
+local stored = nil
+local store = { UpdateAsync = function(_, _, callback) stored = callback(stored) end }
+local profiles = ProfileService.new(store)
+local profilePlayer = { UserId = 123 }
+profiles.Profiles[profilePlayer] = schema.New()
+profiles.AwardReceipts[profilePlayer] = {}
+profiles._sync = function() end
+check(profiles:Award(profilePlayer, { Wins = 1, Coins = 100, Gems = 2 }, "round:1"), "authoritative profile awards valid currency and wins")
+check(not profiles:Award(profilePlayer, { Wins = 1 }, "round:1") and profiles:Get(profilePlayer).Stats.Wins == 1, "award receipt prevents duplicate round reward")
+check(profiles:Spend(profilePlayer, "Coins", 40) and profiles:Get(profilePlayer).Currency.Coins == 60, "profile spends available currency")
+check(not profiles:Spend(profilePlayer, "Coins", 100), "profile rejects insufficient balance")
+check(profiles:Save(profilePlayer) and stored.Stats.Wins == 1, "profile lifecycle saves authoritative state")
+profiles:Release(profilePlayer)
+check(profiles:Get(profilePlayer) == nil, "profile lifecycle releases session state")
 
 print(string.format("PASS: %d V2 assertions", assertions))

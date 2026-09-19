@@ -6,6 +6,8 @@ local expectedScripts = {
 	["ReplicatedStorage.Game.Shared.Config.CombatConfig"] = "ModuleScript",
 	["ReplicatedStorage.Game.Shared.Combat.CombatTypes"] = "ModuleScript",
 	["ReplicatedStorage.Game.Shared.Weapons.WeaponDefinitions"] = "ModuleScript",
+	["ReplicatedStorage.Game.Shared.Balls.BallDefinitions"] = "ModuleScript",
+	["ReplicatedStorage.Game.Shared.Profile.ProfileSchema"] = "ModuleScript",
 	["ReplicatedStorage.Game.Shared.Util.CharacterUtil"] = "ModuleScript",
 	["ReplicatedStorage.Game.Shared.Util.TrajectoryMath"] = "ModuleScript",
 	["ServerScriptService.Game.GameServer"] = "Script",
@@ -14,6 +16,8 @@ local expectedScripts = {
 	["ServerScriptService.Game.BallCore"] = "ModuleScript",
 	["ServerScriptService.Game.TrainingOpponent"] = "ModuleScript",
 	["ServerScriptService.Game.DuelService"] = "ModuleScript",
+	["ServerScriptService.Game.ProfileService"] = "ModuleScript",
+	["ServerScriptService.Game.TargetSelector"] = "ModuleScript",
 	["StarterPlayer.StarterPlayerScripts.Game.ClientBootstrap"] = "LocalScript",
 	["StarterPlayer.StarterPlayerScripts.Game.Input.CombatInputController"] = "ModuleScript",
 	["StarterPlayer.StarterPlayerScripts.Game.Weapons.WeaponPresentationController"] = "ModuleScript",
@@ -40,7 +44,7 @@ for _, serviceName in { "ReplicatedStorage", "ServerScriptService", "StarterPlay
 		end
 	end
 end
-assert(scriptCount == 14, "expected exactly 14 canonical combat foundation scripts")
+assert(scriptCount == 18, "expected exactly 18 canonical vertical-slice scripts")
 
 local replicated = place:GetService("ReplicatedStorage").Game
 for _, name in { "ParryIntent", "BallSnapshot", "CombatEvent" } do assert(replicated.Remotes[name]:IsA("RemoteEvent"), "missing remote " .. name) end
@@ -91,7 +95,7 @@ assert(world:GetAttribute("FatalRuntimeContract") == "CombatCoreV2CleanRoom", "m
 local gameplay = world.Arena.Gameplay
 local spawns = gameplay.SpawnPoints:GetChildren()
 table.sort(spawns, function(a, b) return a.Name < b.Name end)
-assert(#spawns == 2, "clean duel requires exactly two spawn references")
+assert(#spawns == 8, "multiplayer round requires eight deterministic spawn references")
 assert(math.abs((spawns[2].CFrame.Position - spawns[1].CFrame.Position).Magnitude - 40) < 1e-4, "duel spawn separation must preserve the one-second opening read")
 for _, spawn in spawns do assert(spawn.Transparency == 1 and not spawn.CanCollide and not spawn.CanTouch and not spawn.CanQuery, "spawn references must be invisible") end
 local between = (spawns[2].CFrame.Position - spawns[1].CFrame.Position).Unit
@@ -101,4 +105,4 @@ local savedBalls = 0
 for _, value in place:GetService("Workspace"):GetDescendants() do if value:GetAttribute("FatalV2Ball") then savedBalls += 1 end end
 assert(savedBalls == 0, "saved place contains an authoritative gameplay ball")
 
-print("PASS: clean foundation place has 14 scripts, one presentation weapon, readable ball, and no legacy UI")
+print("PASS: clean vertical-slice place has 18 scripts, multiplayer spawns, one presentation weapon, and no legacy UI")
